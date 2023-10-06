@@ -1,10 +1,14 @@
 name: Terraform CI
 
 on:
-  push:
+  pull_request:
+    paths:
+      - '**.tf'
     branches:
       - main
-  pull_request:
+  push:
+    paths:
+      - '**.tf'
     branches:
       - main
 
