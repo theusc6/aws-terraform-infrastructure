@@ -36,19 +36,23 @@ git clone <repository-url>
 ```
 cd terraform-repo/environments/prod
 ```
-3. Make Changes
+3. Create a New Branch
+```
+git checkout -b <your-branch-name>
+```
+5. Make Changes
 Modify the Terraform configuration files as necessary for your infrastructure needs.
-4. Commit & Push
+6. Commit & Push
 ```
 git add .
 git commit -m "Your descriptive commit message"
 git push origin <your-branch-name>
 ```
-5. Open a Pull Request
+6. Open a Pull Request
 ```
 gh pr create --base main --head <your-branch-name> --title "Your PR title" --body "Description of the changes."
 ```
-6. Github Actions CI/CD
+7. Github Actions CI/CD
 GitHub Actions will automatically run terraform init, terraform plan, and, upon merging the PR, terraform apply.
 
 ## Best Practices
