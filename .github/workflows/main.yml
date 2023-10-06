@@ -1,0 +1,78 @@
+name: Terraform CI
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        if: github.event_name == 'pull_request'
+        run: terraform plan -out=plan.tfplan
+        continue-on-error: true
+
+      - name: Comment PR with Plan Result
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v3
+        with:
+          script: |
+            var fs = require('fs');
+            var output = fs.readFileSync('plan.tfplan', 'utf8');
+            github.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Terraform Apply Requires Approval
+        if: github.ref == 'refs/heads/production'
+        run: echo "Terraform Apply needs approval for the production branch"
+
+      - name: Manual Approval
+        if: github.ref == 'refs/heads/production'
+        uses: actions/github-script@v3
+        with:
+          script: |
+            var pr = await github.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            if (pr.data.merged) {
+              github.actions.createWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: "terraform_apply.yml",
+                ref: "production"
+              });
+            }
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/production' && github.event.label.name == 'apply'
+        run: terraform apply -auto-approve
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
