@@ -3,11 +3,16 @@
 This module provisions a VPC endpoint in AWS.
 
 ## Usage
-To implement the VPC endpoint module, use the following code:
+To implement the VPC endpoint module, perform the following steps:
 
+1. Clone the repo (if applicable)
+```
+git clone <repository-url>
+```
+2. Reference the module
 ```
 module "vpc_endpoint_s3" {
-  source        = "./vpc-endpoint-module"
+  source        = "./modules/networking/vpc-endpoint-module"
   vpc_id        = "vpc-12345678"
   service_name  = "com.amazonaws.region.s3"
   endpoint_type = "Gateway"
@@ -16,6 +21,18 @@ module "vpc_endpoint_s3" {
 output "endpoint_id" {
   value = module.vpc_endpoint_s3.vpc_endpoint_id
 }
+```
+3. Initialize Terraform
+```
+terraform init -backend-config="/global/backend.tf"
+```
+4. Plan the Change
+```
+terraform plan
+```
+5. Apply the Change
+```
+terraform apply
 ```
 
 ## Inputs
