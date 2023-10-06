@@ -19,35 +19,21 @@ output "endpoint_id" {
 ```
 
 ## Inputs
-- vpc-id
-  - ID of the VPC in which the endpoint will be created.
-  - 'string'
-  - **Required**
-- service_name
-  - Service name for the endpoint
-  - 'string'
-  - **Required**
-- endpoint_type
-  - Type of the VPC endpoint (Gateway or Interface).
-  - 'string'
-  - Default == "Interface"
-  - Not Required
-- security_group_ids
-  - Security group IDs associated with the endpoint.
-  - 'list(string)'
-  - Default == []
-  - Not Required
- - subnet_ids
-   - Subnet IDs for the endpoint (for Interface type).
-   - 'list(string)'
-   - Default == []
-   - Not Required
+| Name                | Description                                         | Type           | Default  | Required |
+|---------------------|-----------------------------------------------------|----------------|----------|----------|
+| `vpc_id`            | ID of the VPC in which the endpoint will be created. | `string`       | N/A      | Yes      |
+| `service_name`      | Service name for the VPC endpoint.                  | `string`       | N/A      | Yes      |
+| `endpoint_type`     | Type of the VPC endpoint (`Gateway` or `Interface`).| `string`       | `Interface` | No   |
+| `security_group_ids`| Security group IDs associated with the endpoint.    | `list(string)` | `[]`     | No       |
+| `subnet_ids`        | Subnet IDs for the endpoint (for Interface type).   | `list(string)` | `[]`     | No       |
+
 
 ## Outputs
-- vpc_endpoint_id
-  - ID of the VPC Endpoint
-- vpc_endpoint_dns_entry
-  - DNS entries associated with the VPC endpoint
+| Name                     | Description                                |
+|--------------------------|--------------------------------------------|
+| `vpc_endpoint_id`        | ID of the VPC endpoint.                    |
+| `vpc_endpoint_dns_entry` | DNS entries associated with the VPC endpoint. |
+
 
 ## Requirements
 Relevant Terraform version & AWS Provider version
