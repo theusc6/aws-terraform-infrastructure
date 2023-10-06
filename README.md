@@ -36,15 +36,20 @@ git clone <repository-url>
 ```
 cd terraform-repo/environments/prod
 ```
-3. Initialize Terraform
+3. Make Changes
+Modify the Terraform configuration files as necessary for your infrastructure needs.
+4. Commit & Push
 ```
-terraform init -backend-config="../../global/backend.tf"
+git add .
+git commit -m "Your descriptive commit message"
+git push origin <your-branch-name>
 ```
-4. Plan & Apply
+5. Open a Pull Request
 ```
-terraform plan
-terraform apply
+gh pr create --base main --head <your-branch-name> --title "Your PR title" --body "Description of the changes."
 ```
+6. Github Actions CI/CD
+GitHub Actions will automatically run terraform init, terraform plan, and, upon merging the PR, terraform apply.
 
 ## Best Practices
 - **Do Not Hardcode**: Use variables for any values that might change.
