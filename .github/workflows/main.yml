@@ -11,26 +11,33 @@ on:
       - '**.tf'
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      confirmApply:
+        description: 'Type "yes" to confirm apply on main'
+        required: false
 
 permissions:
-  id-token: write
-  contents: write
-  pull-requests: write
+  id-token: write # This is required for aws oidc connection
+  contents: write # This is required for actions/checkout
+  pull-requests: write # This is required for gh bot to comment PR
   actions: write
   issues: write
 
 env:
   AWS_ROLE_TO_ASSUME: ${{ secrets.DEPLOY_ROLE }}
-  AWS_REGION: "us-west-2" # Modify this if you're using a different region.
+  AWS_REGION: "us-west-2"
+  SECRET_KEY: ${{ secrets.SECRET_KEY }}
 
 jobs:
   terraform:
     name: Terraform
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      
+      - uses: actions/checkout@v2
+        with:
+          token: ${{ env.SECRET_KEY }}  # Use the GH_TOKEN for checkout
+
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -50,9 +57,7 @@ jobs:
       - name: Terraform Plan
         id: plan
         if: github.event_name == 'pull_request'
-        run: |
-          terraform plan -out=plan.tfplan > plan_output.txt
-        continue-on-error: true
+        run: terraform plan -out=plan.tfplan > plan_output.txt
 
       - name: Check for Plan Errors
         run: |
@@ -74,7 +79,50 @@ jobs:
               repo: context.repo.repo,
               body: output
             });
+        env:  # Pass GH_TOKEN to this step for the GitHub Script
+          GH_TOKEN: ${{ env.SECRET_KEY }}
+
+  checkov-scan:
+    name: Checkov Security Scan
+    needs: terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          token: ${{ env.SECRET_KEY }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+          
+      - name: Install Checkov
+        run: pip install checkov
+
+      - name: Run Checkov
+        run: checkov -d .
+
+  apply:
+    name: Apply Terraform
+    needs: checkov-scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.confirmApply == 'yes'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          token: ${{ env.SECRET_KEY }}
+
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-session
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
 
       - name: Terraform Apply
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve
