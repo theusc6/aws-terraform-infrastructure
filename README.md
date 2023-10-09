@@ -47,7 +47,7 @@ Modify the Terraform configuration files as necessary for your infrastructure ne
 git tag -a v0.1.1 -m "Short description of the changes in this version"
 git push origin v0.1.1
 ```
-Remember: Tagging should reflect the significance of the changes. Not every commit needs a new tag; only tag commits that represent a significant milestone or release.
+Note: Tagging should reflect the significance of the changes. Not every commit needs a new tag; only tag commits that represent a significant milestone or release.
 6. Commit & Push
 ```
 git add .
