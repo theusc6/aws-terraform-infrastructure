@@ -97,7 +97,7 @@ jobs:
         run: pip install checkov
 
       - name: Run Checkov
-        run: checkov -d .
+        run: checkov -d . --download-external-modules
 
   apply:
     name: Apply Terraform
