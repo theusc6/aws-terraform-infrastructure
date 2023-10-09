@@ -1,3 +1,7 @@
+module "global_config" {
+  source = "./global/"
+}
+
 module "vpc_endpoint_s3" {
   source        = "path-to-your-module/vpc-endpoint-module"
   vpc_id        = "vpc-12345678"
