@@ -1,6 +1,6 @@
 module "vpc_endpoint_s3" {
-  source        = "path-to-your-module/vpc-endpoint-module"
-  vpc_id        = "vpc-12345679"
+  source        = "github.com/theusc6/terraform-infrastructure//modules/networking/vpc-endpoint-module?ref=v0.1.0"
+  vpc_id        = "vpc-12345678"
   service_name  = "com.amazonaws.region.s3"
   endpoint_type = "Gateway"
 }
