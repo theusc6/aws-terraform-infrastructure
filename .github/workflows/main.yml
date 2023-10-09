@@ -27,7 +27,7 @@ permissions:
 env:
   AWS_ROLE_TO_ASSUME: ${{ secrets.DEPLOY_ROLE }}
   AWS_REGION: "us-west-2"
-  SECRET_KEY: ${{ secrets.SECRET_KEY }}
+  SECRET_KEY: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   terraform:
@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          token: ${{ env.SECRET_KEY }}  # Use the GH_TOKEN for checkout
+          token: ${{ env.SECRET_KEY }}
 
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v1
