@@ -11,11 +11,6 @@ on:
       - '**.tf'
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      confirmApply:
-        description: 'Type "yes" to confirm apply on main'
-        required: false
 
 permissions:
   id-token: write # This is required for aws oidc connection
