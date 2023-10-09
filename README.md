@@ -17,7 +17,6 @@ terraform-repo/
 │
 └── global/
     ├── backend.tf
-    └── providers.tf
 ```
 - environments/: Contains configurations specific to each environment. Each has its own state file.
 - modules/: Contains reusable Terraform modules used across different environments.
@@ -40,19 +39,26 @@ cd terraform-repo/environments/prod
 ```
 git checkout -b <your-branch-name>
 ```
-5. Make Changes
+4. Make Changes
 Modify the Terraform configuration files as necessary for your infrastructure needs.
+
+5. Tag your Changes (for significant changes or releases)
+```
+git tag -a v0.1.1 -m "Short description of the changes in this version"
+git push origin v0.1.1
+```
+Remember: Tagging should reflect the significance of the changes. Not every commit needs a new tag; only tag commits that represent a significant milestone or release.
 6. Commit & Push
 ```
 git add .
 git commit -m "Your descriptive commit message"
 git push origin <your-branch-name>
 ```
-6. Open a Pull Request
+7. Open a Pull Request
 ```
 gh pr create --base main --head <your-branch-name> --title "Your PR title" --body "Description of the changes."
 ```
-7. Github Actions CI/CD
+8. Github Actions CI/CD
 GitHub Actions will automatically run terraform init, terraform plan, and, upon merging the PR, terraform apply.
 
 ## Best Practices
