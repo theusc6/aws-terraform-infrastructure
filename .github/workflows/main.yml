@@ -12,6 +12,17 @@ on:
     branches:
       - main
 
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+  actions: write
+  issues: write
+
+env:
+  AWS_ROLE_TO_ASSUME: ${{ secrets.DEPLOY_ROLE }}
+  AWS_REGION: "us-west-2" # Modify this if you're using a different region.
+
 jobs:
   terraform:
     name: Terraform
@@ -20,6 +31,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-session
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
 
@@ -60,7 +78,3 @@ jobs:
       - name: Terraform Apply
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve
-
-env:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
