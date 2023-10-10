@@ -3,8 +3,7 @@ name: Generate Changelog
 on:
   push:
     branches:
-      - main # Or your default branch name, e.g., master
-
+      - main 
 jobs:
   generate-changelog:
     runs-on: ubuntu-latest
