@@ -97,7 +97,9 @@ jobs:
         run: pip install checkov
 
       - name: Run Checkov
-        run: checkov -d . --download-external-modules true
+        run: |
+          # Skipping CKV_TF_1 check due to the decision to use semantic versioning tags for module sources.
+          checkov -d . --download-external-modules true --skip-check CKV_TF_1
 
   apply:
     name: Apply Terraform
