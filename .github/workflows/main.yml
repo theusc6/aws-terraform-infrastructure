@@ -41,7 +41,7 @@ jobs:
           role-session-name: github-actions-session
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v2.0.3
 
       - name: Terraform Init
         run: |
@@ -89,7 +89,7 @@ jobs:
           token: ${{ env.SECRET_KEY }}
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4.7.1
         with:
           python-version: '3.11'
           
@@ -120,7 +120,7 @@ jobs:
           role-session-name: github-actions-session
       
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v2.0.3
 
       - name: Terraform Apply
         run: |
