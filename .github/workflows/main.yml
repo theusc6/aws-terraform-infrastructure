@@ -105,7 +105,8 @@ jobs:
     name: Apply Terraform
     needs: checkov-scan
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.confirmApply == 'yes'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
