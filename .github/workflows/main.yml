@@ -7,15 +7,17 @@ on:
     branches:
       - main
   push:
+    tags:
+      - 'dev-*'
+      - 'staging-*'
+      - 'prod-*'
     paths:
       - '**.tf'
-    branches:
-      - main
 
 permissions:
-  id-token: write # This is required for aws oidc connection
-  contents: write # This is required for actions/checkout
-  pull-requests: write # This is required for gh bot to comment PR
+  id-token: write
+  contents: write
+  pull-requests: write
   actions: write
   issues: write
 
@@ -45,20 +47,20 @@ jobs:
 
       - name: Terraform Init
         run: |
-          terraform init -backend-config="key=${{ github.ref }}/terraform.tfstate"
+          ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
+          terraform init -backend-config="key=$ENVIRONMENT/terraform.tfstate"
 
       - name: Terraform Validate
         run: terraform validate
 
       - name: Terraform Plan
-        id: plan
         if: github.event_name == 'pull_request'
         run: terraform plan -out=plan.tfplan > plan_output.txt
 
       - name: Check for Plan Errors
         run: |
           if grep -q "Error:" plan_output.txt; then
-            echo "Terraform plan failed. See the PR comments or the above logs for details."
+            echo "Terraform plan failed. Check the logs for details."
             exit 1
           fi
 
@@ -75,7 +77,7 @@ jobs:
               repo: context.repo.repo,
               body: output
             });
-        env:  # Pass GH_TOKEN to this step for the GitHub Script
+        env:
           GH_TOKEN: ${{ env.SECRET_KEY }}
 
   checkov-scan:
@@ -92,21 +94,19 @@ jobs:
         uses: actions/setup-python@v4.7.1
         with:
           python-version: '3.11'
-          
+
       - name: Install Checkov
         run: pip install checkov
 
       - name: Run Checkov
         run: |
-          # Skipping CKV_TF_1 check due to the decision to use semantic versioning tags for module sources.
           checkov -d . --download-external-modules true --skip-check CKV_TF_1
 
   apply:
     name: Apply Terraform
     needs: checkov-scan
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+    if: startsWith(github.ref, 'refs/tags/dev-') || startsWith(github.ref, 'refs/tags/staging-')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
@@ -119,16 +119,15 @@ jobs:
           role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: github-actions-session
-      
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2.0.3
 
       - name: Terraform Apply
         run: |
-          set +e  # This allows the script to continue even after errors
+          set +e
           terraform apply -auto-approve > apply_output.txt
           if grep -q "Error:" apply_output.txt; then
             echo "Terraform apply failed. Check the logs for details."
             exit 1
           fi
-
