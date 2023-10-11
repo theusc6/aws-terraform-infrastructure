@@ -1,7 +1,7 @@
 resource "aws_s3_bucket" "test_deploy_bucket" {
   bucket = "test-deploy-bucket"
   acl    = "private"
-}
+
   versioning {
     enabled = true
   }
