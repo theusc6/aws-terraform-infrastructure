@@ -102,16 +102,43 @@ jobs:
         run: |
           checkov -d . --download-external-modules true --skip-check CKV_TF_1
 
-  apply:
-    name: Apply Terraform
-    needs: checkov-scan
+  tflint-check:
+    name: TFLint Check
+    needs: terraform
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/dev-') || startsWith(github.ref, 'refs/tags/staging-')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
         with:
           token: ${{ env.SECRET_KEY }}
+
+      - name: Install TFLint
+        run: |
+          wget https://github.com/terraform-linters/tflint/releases/download/v0.34.0/tflint_linux_amd64.zip
+          unzip tflint_linux_amd64.zip
+          sudo mv tflint /usr/local/bin/
+
+      - name: Run TFLint
+        run: tflint
+        
+  apply:
+    name: Apply Terraform
+    needs: [checkov-scan, tflint-check]
+    runs-on: ubuntu-latest
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/staging-') || startsWith(github.ref, 'refs/tags/prod-')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+        with:
+          token: ${{ env.SECRET_KEY }}
+
+      - name: Determine Environment from Branch or Tag
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
+          fi
 
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v4.0.1
@@ -131,3 +158,4 @@ jobs:
             echo "Terraform apply failed. Check the logs for details."
             exit 1
           fi
+
