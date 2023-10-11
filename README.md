@@ -55,10 +55,12 @@ Once your PR is approved, merge it to the main branch. Any merge into main will 
 8. Tag for Staging or Production
 When you decide the main branch's state is ready for staging or production, create a tag:
 ```
+git checkout main
+git pull
 git tag <env>-vX.Y.Z # For example: git tag staging-v0.1.1
 git push origin <env>-vX.Y.Z
 ```
-Note: Adjust <env> to dev, staging, or prod depending on where you want the deployment.
+Note: Adjust <env> to staging or prod depending on where you want the deployment. Once this tag is pushed, the CI/CD workflow will detect this tag and initiate the deployment process to the designated environment.
 
 9. Github Actions CI/CD
 GitHub Actions will automatically run terraform init, terraform plan, and, upon detecting an environment-specific tag, terraform apply.
