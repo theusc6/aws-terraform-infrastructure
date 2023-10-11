@@ -14,13 +14,10 @@ terraform-repo/
 │   ├── compute/
 │   ├── networking/
 │   └── storage/
-│
-└── global/
-    ├── backend.tf
+
 ```
 - environments/: Contains configurations specific to each environment. Each has its own state file.
 - modules/: Contains reusable Terraform modules used across different environments.
-- global/: Global configurations, including backend and provider setups.
 
 ## Prerequisites
 - Terraform (version >= 0.14)
@@ -33,33 +30,38 @@ git clone <repository-url>
 ```
 2. Navigate to an Environment
 ```
-cd terraform-repo/environments/prod
+cd terraform-repo/environments/<env>  # Replace <env> with dev, staging, or prod
 ```
 3. Create a New Branch
 ```
-git checkout -b <your-branch-name>
+git checkout -b feature-<feature-name> # For example: git checkout -b feature-add-s3
 ```
 4. Make Changes
 Modify the Terraform configuration files as necessary for your infrastructure needs.
 
-5. Tag your Changes (for significant changes or releases)
-```
-git tag -a v0.1.1 -m "Short description of the changes in this version"
-git push origin v0.1.1
-```
-Note: Tagging should reflect the significance of the changes. Not every commit needs a new tag; only tag commits that represent a significant milestone or release.
-6. Commit & Push
+5. Commit & Push Your Changes
 ```
 git add .
 git commit -m "Your descriptive commit message"
-git push origin <your-branch-name>
+git push origin feature-<feature-name>
 ```
-7. Open a Pull Request
+6. Open a Pull Request
 ```
-gh pr create --base main --head <your-branch-name> --title "Your PR title" --body "Description of the changes."
+gh pr create --base main --head feature-<feature-name> --title "Your PR title" --body "Description of the changes."
 ```
-8. Github Actions CI/CD
-GitHub Actions will automatically run terraform init, terraform plan, and, upon merging the PR, terraform apply.
+7. Merge Pull Request
+Once your PR is approved, merge it to the main branch. Any merge into main will automatically deploy to the development environment.
+
+8. Tag for Staging or Production
+When you decide the main branch's state is ready for staging or production, create a tag:
+```
+git tag <env>-vX.Y.Z # For example: git tag staging-v0.1.1
+git push origin <env>-vX.Y.Z
+```
+Note: Adjust <env> to dev, staging, or prod depending on where you want the deployment.
+
+9. Github Actions CI/CD
+GitHub Actions will automatically run terraform init, terraform plan, and, upon detecting an environment-specific tag, terraform apply.
 
 ## Best Practices
 - **Do Not Hardcode**: Use variables for any values that might change.
@@ -71,3 +73,8 @@ GitHub Actions will automatically run terraform init, terraform plan, and, upon 
 1. Create a new branch for your changes.
 2. Make changes and test them thoroughly.
 3. Open a pull request, and request reviews from the team once all checks are complete and passed.
+
+Note: 
+Merging a PR into main automatically deploys to dev.
+Tagging a commit as staging-vX.Y.Z would deploy that commit to the staging environment.
+Tagging a commit as prod-vX.Y.Z would deploy that commit to the production environment.
