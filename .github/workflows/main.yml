@@ -47,9 +47,13 @@ jobs:
 
       - name: Terraform Init
         run: |
-          ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
-            cd environments/$ENVIRONMENT
-            terraform init -backend-config="key=$ENVIRONMENT/terraform.tfstate"
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ENVIRONMENT=dev # Assuming you want to use 'dev' for pull requests
+          else
+            ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
+          fi
+          cd environments/$ENVIRONMENT
+          terraform init -backend-config="key=$ENVIRONMENT/terraform.tfstate"
 
       - name: Terraform Validate
         run: |
