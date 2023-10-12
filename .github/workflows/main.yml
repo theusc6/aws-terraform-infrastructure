@@ -45,23 +45,26 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2.0.3
 
+      # Add Terraform Format Step
       - name: Terraform Format
-        run: terraform fmt -check -diff
+        run: terraform fmt -check
+
+      - name: Determine Environment from Branch or Tag
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV # Default environment for pull requests
+          else
+            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
+          fi
 
       - name: Terraform Init
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            ENVIRONMENT=dev # Assuming you want to use 'dev' for pull requests
-          else
-            ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
-          fi
-          cd environments/$ENVIRONMENT
-          terraform init -backend-config="key=$ENVIRONMENT/terraform.tfstate"
+          cd environments/${ENVIRONMENT}
+          terraform init -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
 
       - name: Terraform Validate
         run: |
-          ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
-          cd environments/$ENVIRONMENT
+          cd environments/${ENVIRONMENT}
           terraform validate
 
       - name: Terraform Plan
