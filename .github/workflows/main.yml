@@ -35,6 +35,14 @@ jobs:
         with:
           token: ${{ env.SECRET_KEY }}
 
+      - name: Determine Environment from Branch or Tag
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV # Default environment for pull requests
+          else
+            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
+          fi
+      
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
@@ -45,35 +53,25 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2.0.3
 
-      # Add Terraform Format Step
       - name: Terraform Format
         run: terraform fmt -check
 
-      - name: Determine Environment from Branch or Tag
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "ENVIRONMENT=dev" >> $GITHUB_ENV # Default environment for pull requests
-          else
-            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
-          fi
-
       - name: Terraform Init
         run: |
-          cd environments/${ENVIRONMENT}
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           terraform init -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
 
       - name: Terraform Validate
         run: |
-          cd environments/${ENVIRONMENT}
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           terraform validate
 
       - name: Terraform Plan
         if: github.event_name == 'pull_request'
         run: |
-          cd environments/${ENVIRONMENT}
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           terraform plan -out=plan.tfplan > plan_output.txt
 
-          
       - name: Check for Plan Errors
         run: |
           if grep -q "Error:" plan_output.txt; then
@@ -137,7 +135,7 @@ jobs:
 
       - name: Run TFLint
         run: tflint
-        
+
   apply:
     name: Apply Terraform
     needs: [checkov-scan, tflint-check]
