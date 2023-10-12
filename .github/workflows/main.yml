@@ -78,20 +78,21 @@ jobs:
         run: ls -al
 
       - name: Comment PR with Plan Result
-        if: github.event_name == 'pull_request' && steps.terraform-plan.outcome == 'success'
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v6.4.1
         with:
           script: |
             var fs = require('fs');
-            var output = fs.readFileSync('${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}/plan_output.txt', 'utf8');
-            github.issues.createComment({
+            var output = fs.readFileSync('/home/runner/work/terraform-infrastructure/terraform-infrastructure/environments/dev/plan_output.txt', 'utf8');
+            github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: output
             });
         env:
-          GH_TOKEN: ${{ env.SECRET_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
   checkov-scan:
     name: Checkov Security Scan
