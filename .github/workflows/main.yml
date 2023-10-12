@@ -71,7 +71,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
-          terraform plan -out=plan.tfplan > plan_output.txt
+          terraform plan -out=plan.tfplan -no-color > plan_output.txt
 
       # Diagnostic step to list directory contents
       - name: List directory contents
@@ -83,16 +83,14 @@ jobs:
         with:
           script: |
             var fs = require('fs');
-            var output = fs.readFileSync('/home/runner/work/terraform-infrastructure/terraform-infrastructure/environments/dev/plan_output.txt', 'utf8');
+            var outputFilePath = `${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}/plan_output.txt`;
+            var output = fs.readFileSync(outputFilePath, 'utf8');
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: output
             });
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
 
   checkov-scan:
     name: Checkov Security Scan
