@@ -45,6 +45,9 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2.0.3
 
+      - name: Terraform Format
+        run: terraform fmt -check -diff
+
       - name: Terraform Init
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
