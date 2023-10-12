@@ -67,25 +67,23 @@ jobs:
           terraform validate
 
       - name: Terraform Plan
+        id: terraform-plan
         if: github.event_name == 'pull_request'
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           terraform plan -out=plan.tfplan > plan_output.txt
 
-      - name: Check for Plan Errors
-        run: |
-          if grep -q "Error:" plan_output.txt; then
-            echo "Terraform plan failed. Check the logs for details."
-            exit 1
-          fi
+      # Diagnostic step to list directory contents
+      - name: List directory contents
+        run: ls -al
 
       - name: Comment PR with Plan Result
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.terraform-plan.outcome == 'success'
         uses: actions/github-script@v6.4.1
         with:
           script: |
             var fs = require('fs');
-            var output = fs.readFileSync('plan_output.txt', 'utf8');
+            var output = fs.readFileSync('${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}/plan_output.txt', 'utf8');
             github.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -175,5 +173,3 @@ jobs:
             echo "Terraform apply failed. Check the logs for details."
             exit 1
           fi
-
-
