@@ -70,9 +70,9 @@ jobs:
       - name: Terraform Plan
         if: github.event_name == 'pull_request'
         run: |
-          ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
-          cd environments/$ENVIRONMENT
+          cd environments/${ENVIRONMENT}
           terraform plan -out=plan.tfplan > plan_output.txt
+
           
       - name: Check for Plan Errors
         run: |
