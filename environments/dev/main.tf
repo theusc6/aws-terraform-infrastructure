@@ -1,17 +1,8 @@
-resource "aws_s3_bucket" "test_deploy_bucket" {
-  bucket = "test-deploy-bucket"
-  acl    = "private"
+resource "aws_account_alternate_contact" "security" {
+alternate_contact_type = "SECURITY"
 
-  versioning {
-    enabled = true
-  }
-
-  # Enable server-side encryption by default
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
+name              = "Test Name"
+title             = "Test Title"
+phone_number      = "+1234567890"
+email_address     = "testemail@test.com"
 }
