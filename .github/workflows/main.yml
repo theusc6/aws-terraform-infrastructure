@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "Event Name: ${{ github.event_name }}"
           echo "Ref: ${{ github.ref }}"
-          
+
   terraform:
     name: Terraform
     runs-on: ubuntu-latest
@@ -51,7 +51,7 @@ jobs:
           else
             echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
           fi
-      
+
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
@@ -69,11 +69,19 @@ jobs:
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           terraform init -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
-
       - name: Terraform Validate
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           terraform validate
+
+      - name: Print working directory
+        run: pwd
+
+      - name: List files in current directory
+        run: ls -al
+
+      - name: Print environment variables
+        run: printenv
 
       - name: Terraform Plan
         id: terraform-plan
@@ -133,14 +141,6 @@ jobs:
         with:
           token: ${{ env.SECRET_KEY }}
     
-      - name: Determine Environment from Branch or Tag
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "ENVIRONMENT=dev" >> $GITHUB_ENV # Default environment for pull requests
-          else
-            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
-          fi
-  
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
@@ -158,9 +158,7 @@ jobs:
         run: tflint --init
     
       - name: Run TFLint
-        run: |
-          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
-          tflint
+        run: tflint
 
   apply:
     name: Apply Terraform
