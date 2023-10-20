@@ -123,27 +123,27 @@ jobs:
         run: |
           checkov -d . --download-external-modules true --skip-check CKV_TF_1
 
-tflint-check:
-  name: TFLint Check
-  needs: terraform
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v4.1.0
-      with:
-        token: ${{ env.SECRET_KEY }}
-
-    - name: Install TFLint
-      run: |
-        wget https://github.com/terraform-linters/tflint/releases/download/v0.34.0/tflint_linux_amd64.zip
-        unzip tflint_linux_amd64.zip
-        sudo mv tflint /usr/local/bin/
-
-    - name: Initialize TFLint AWS Plugin
-      run: tflint --init
-
-    - name: Run TFLint
-      run: tflint
+  tflint-check:
+    name: TFLint Check
+    needs: terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+        with:
+          token: ${{ env.SECRET_KEY }}
+  
+      - name: Install TFLint
+        run: |
+          wget https://github.com/terraform-linters/tflint/releases/download/v0.34.0/tflint_linux_amd64.zip
+          unzip tflint_linux_amd64.zip
+          sudo mv tflint /usr/local/bin/
+  
+      - name: Initialize TFLint AWS Plugin
+        run: tflint --init
+  
+      - name: Run TFLint
+        run: tflint
 
   apply:
     name: Apply Terraform
