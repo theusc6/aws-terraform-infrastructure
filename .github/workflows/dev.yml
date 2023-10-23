@@ -1,0 +1,199 @@
+name: Terraform CI
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+    branches:
+      - main
+  push:
+    tags:
+      - 'dev-*'
+    paths:
+      - '**.tf'
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+  actions: write
+  issues: write
+
+env:
+  AWS_ROLE_TO_ASSUME: ${{ secrets.DEV_DEPLOY_ROLE }}
+  AWS_REGION: "us-west-2"
+  SECRET_KEY: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print event name and ref
+        run: |
+          echo "Event Name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.0
+        with:
+          token: ${{ env.SECRET_KEY }}
+
+      - name: Determine Environment from Branch or Tag
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV # Default environment for pull requests
+          else
+            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
+          fi
+
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-session
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2.0.3
+
+      - name: Terraform Format
+        run: terraform fmt -check
+
+      - name: Terraform Init
+        run: |
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
+          terraform init -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
+      - name: Terraform Validate
+        run: |
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
+          terraform validate
+
+      - name: Print working directory
+        run: pwd
+
+      - name: List files in current directory
+        run: ls -al
+
+      - name: Print environment variables
+        run: printenv
+
+      - name: Terraform Plan
+        id: terraform-plan
+        if: github.event_name == 'pull_request'
+        run: |
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
+          terraform plan -out=plan.tfplan -no-color > plan_output.txt
+
+      # Diagnostic step to list directory contents
+      - name: List directory contents
+        run: ls -al
+
+      - name: Comment PR with Plan Result
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6.4.1
+        with:
+          script: |
+            var fs = require('fs');
+            var outputFilePath = `${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}/plan_output.txt`;
+            var output = fs.readFileSync(outputFilePath, 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+  checkov-scan:
+    name: Checkov Security Scan
+    needs: terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+        with:
+          token: ${{ env.SECRET_KEY }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4.7.1
+        with:
+          python-version: '3.11'
+
+      - name: Install Checkov
+        run: pip install checkov
+
+      - name: Run Checkov
+        run: |
+          checkov -d . --download-external-modules true --skip-check CKV_TF_1
+
+  tflint-check:
+    name: TFLint Check
+    needs: terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+        with:
+          token: ${{ env.SECRET_KEY }}
+    
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-session
+    
+      - name: Install TFLint
+        run: |
+          wget https://github.com/terraform-linters/tflint/releases/download/v0.34.0/tflint_linux_amd64.zip
+          unzip tflint_linux_amd64.zip
+          sudo mv tflint /usr/local/bin/
+    
+      - name: Initialize TFLint AWS Plugin
+        run: tflint --init
+    
+      - name: Run TFLint
+        run: tflint --loglevel debug
+
+  apply:
+    name: Apply Terraform
+    needs: [checkov-scan, tflint-check]
+    runs-on: ubuntu-latest
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+        with:
+          token: ${{ env.SECRET_KEY }}
+
+      - name: Determine Environment from Branch or Tag
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
+          fi
+
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-session
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2.0.3
+
+      - name: Terraform Apply
+        run: |
+          set +e
+          ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
+          cd environments/$ENVIRONMENT
+          terraform apply -auto-approve > apply_output.txt
+          if grep -q "Error:" apply_output.txt; then
+            echo "Terraform apply failed. Check the logs for details."
+            exit 1
+          fi
