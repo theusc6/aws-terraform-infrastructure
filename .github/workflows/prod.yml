@@ -3,7 +3,7 @@ name: Terraform CI
 on:
   pull_request:
     paths:
-      - '**.tf'
+      - 'environments/prod/**.tf'
     branches:
       - main
   push:
