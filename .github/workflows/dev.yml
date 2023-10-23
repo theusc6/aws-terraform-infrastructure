@@ -20,7 +20,7 @@ permissions:
   issues: write
 
 env:
-  AWS_ROLE_TO_ASSUME: ${{ secrets.DEV_DEPLOY_ROLE }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.DEPLOY_ROLE }}
   AWS_REGION: "us-west-2"
   SECRET_KEY: ${{ secrets.GITHUB_TOKEN }}
 
