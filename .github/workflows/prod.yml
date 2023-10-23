@@ -162,7 +162,7 @@ jobs:
     name: Apply Terraform
     needs: [checkov-scan, tflint-check]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/prod-') && contains(github.event.head_commit.modified, 'environments/prod/')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.ref, 'refs/tags/prod-') && contains(github.event.head_commit.modified, 'environments/prod/')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
