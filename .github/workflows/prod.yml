@@ -8,8 +8,6 @@ on:
       - main
   push:
     tags:
-      - 'dev-*'
-      - 'staging-*'
       - 'prod-*'
     paths:
       - '**.tf'
@@ -22,7 +20,7 @@ permissions:
   issues: write
 
 env:
-  AWS_ROLE_TO_ASSUME: ${{ secrets.DEPLOY_ROLE }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.PROD_DEPLOY_ROLE }}
   AWS_REGION: "us-west-2"
   SECRET_KEY: ${{ secrets.GITHUB_TOKEN }}
 
@@ -47,7 +45,7 @@ jobs:
       - name: Determine Environment from Branch or Tag
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "ENVIRONMENT=dev" >> $GITHUB_ENV # Default environment for pull requests
+            echo "ENVIRONMENT=prod" >> $GITHUB_ENV # Default environment for pull requests
           else
             echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
           fi
@@ -164,7 +162,7 @@ jobs:
     name: Apply Terraform
     needs: [checkov-scan, tflint-check]
     runs-on: ubuntu-latest
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/staging-') || startsWith(github.ref, 'refs/tags/prod-')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && contains(github.event.head_commit.modified, 'environments/prod/')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
@@ -174,7 +172,7 @@ jobs:
       - name: Determine Environment from Branch or Tag
         run: |
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+            echo "ENVIRONMENT=prod" >> $GITHUB_ENV
           else
             echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
           fi
