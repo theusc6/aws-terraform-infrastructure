@@ -24,35 +24,35 @@ terraform-repo/
 - Appropriate cloud provider CLI and credentials set up. For AWS, AWS CLI and configured credentials.
 
 ## Getting Started
-1. Clone the Repo
+### 1. Clone the Repo
 ```
 git clone <repository-url>
 ```
-2. Navigate to an Environment
+### 2. Navigate to an Environment
 ```
 cd terraform-repo/environments/<env>  # Replace <env> with dev, staging, or prod
 ```
-3. Create a New Branch
+### 3. Create a New Branch
 ```
 git checkout -b feature-<feature-name> # For example: git checkout -b feature-add-s3
 ```
-4. Make Changes
+### 4. Make Changes
 Modify the Terraform configuration files as necessary for your infrastructure needs.
 
-5. Commit & Push Your Changes
+### 5. Commit & Push Your Changes
 ```
 git add .
 git commit -m "Your descriptive commit message"
 git push origin feature-<feature-name>
 ```
-6. Open a Pull Request
+### 6. Open a Pull Request
 ```
 gh pr create --base main --head feature-<feature-name> --title "Your PR title" --body "Description of the changes."
 ```
-7. Merge Pull Request
+### 7. Merge Pull Request
 Once your PR is approved, merge it to the main branch. Any merge into main will automatically deploy to the development environment.
 
-8. Tag for Staging or Production
+### 8. Tag for Staging or Production
 When you decide the main branch's state is ready for staging or production, create a tag:
 ```
 git checkout main
@@ -62,7 +62,7 @@ git push origin <env>-vX.Y.Z
 ```
 Note: Adjust <env> to staging or prod depending on where you want the deployment. Once this tag is pushed, the CI/CD workflow will detect this tag and initiate the deployment process to the designated environment.
 
-9. Github Actions CI/CD
+### 9. Github Actions CI/CD
 GitHub Actions will automatically run terraform init, terraform plan, and, upon detecting an environment-specific tag, terraform apply.
 
 ## Best Practices
