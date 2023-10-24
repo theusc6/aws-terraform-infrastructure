@@ -23,6 +23,8 @@ env:
   AWS_ROLE_TO_ASSUME: ${{ secrets.DEPLOY_ROLE }}
   AWS_REGION: "us-west-2"
   SECRET_KEY: ${{ secrets.GITHUB_TOKEN }}
+  ENVIRONMENT: dev
+
 
 jobs:
 
@@ -41,14 +43,6 @@ jobs:
       - uses: actions/checkout@v4.1.0
         with:
           token: ${{ env.SECRET_KEY }}
-
-      - name: Determine Environment from Branch or Tag
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "ENVIRONMENT=dev" >> $GITHUB_ENV # Default environment for pull requests
-          else
-            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
-          fi
 
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v4.0.1
@@ -168,14 +162,6 @@ jobs:
         with:
           token: ${{ env.SECRET_KEY }}
 
-      - name: Determine Environment from Branch or Tag
-        run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
-          else
-            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
-          fi
-
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
@@ -189,11 +175,7 @@ jobs:
       - name: Terraform Apply
         run: |
           set +e
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            ENVIRONMENT=dev
-          else
-            ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
-          fi
+          ENVIRONMENT=dev
           cd environments/$ENVIRONMENT
           terraform apply -auto-approve > apply_output.txt
           if grep -q "Error:" apply_output.txt; then
