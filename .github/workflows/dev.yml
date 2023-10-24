@@ -189,10 +189,15 @@ jobs:
       - name: Terraform Apply
         run: |
           set +e
-          ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            ENVIRONMENT=dev
+          else
+            ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
+          fi
           cd environments/$ENVIRONMENT
           terraform apply -auto-approve > apply_output.txt
           if grep -q "Error:" apply_output.txt; then
             echo "Terraform apply failed. Check the logs for details."
             exit 1
           fi
+
