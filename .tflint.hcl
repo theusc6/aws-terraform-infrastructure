@@ -1,4 +1,10 @@
 plugin "aws" {
+    enabled = true
+    version = "0.27.0"
+    source  = "github.com/terraform-linters/tflint-ruleset-aws"
+}
+
+plugin "terraform" {
   enabled = true
-  deep_check = true
+  preset  = "recommended"
 }
