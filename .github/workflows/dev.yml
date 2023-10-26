@@ -158,7 +158,7 @@ jobs:
       - name: Run TFLint
         run: tflint
         env:
-          TFLINT_LOG: debug
+          TFLINT_LOG: trace
 
 
   apply:
