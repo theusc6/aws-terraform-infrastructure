@@ -195,3 +195,9 @@ jobs:
             exit 1
           fi
 
+      - name: Upload apply_output.txt as artifact
+        if: always() # This ensures the step runs even if previous steps fail
+        uses: actions/upload-artifact@v2
+        with:
+          name: terraform-apply-output
+          path: environments/dev/apply_output.txt
