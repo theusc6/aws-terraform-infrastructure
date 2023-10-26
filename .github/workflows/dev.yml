@@ -150,7 +150,9 @@ jobs:
         run: tflint --init
     
       - name: Run TFLint
-        run: tflint --loglevel debug
+        run: tflint
+        env:
+          TFLINT_LOG: debug
 
   apply:
     name: Apply Terraform
