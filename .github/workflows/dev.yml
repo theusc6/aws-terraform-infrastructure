@@ -186,6 +186,9 @@ jobs:
           set +e
           ENVIRONMENT=dev
           cd environments/$ENVIRONMENT
+
+          export TF_LOG=TRACE
+          
           terraform apply -auto-approve > apply_output.txt
           if grep -q "Error:" apply_output.txt; then
             echo "Terraform apply failed. Check the logs for details."
