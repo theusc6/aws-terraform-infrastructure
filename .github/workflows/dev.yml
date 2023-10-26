@@ -132,27 +132,34 @@ jobs:
         uses: actions/checkout@v4.1.0
         with:
           token: ${{ env.SECRET_KEY }}
-    
+  
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: github-actions-session
-    
+  
       - name: Install TFLint
         run: |
           wget https://github.com/terraform-linters/tflint/releases/download/v0.48.0/tflint_linux_amd64.zip
           unzip tflint_linux_amd64.zip
           sudo mv tflint /usr/local/bin/
-    
+  
+      - name: Install TFLint AWS Plugin
+        run: |
+          mkdir -p ~/.tflint.d/plugins
+          wget https://github.com/terraform-linters/tflint-ruleset-aws/releases/download/v0.27.0/tflint-ruleset-aws_linux_amd64.zip
+          unzip tflint-ruleset-aws_linux_amd64.zip -d ~/.tflint.d/plugins/
+  
       - name: Initialize TFLint AWS Plugin
         run: tflint --init
-    
+  
       - name: Run TFLint
         run: tflint
         env:
           TFLINT_LOG: debug
+
 
   apply:
     name: Apply Terraform
