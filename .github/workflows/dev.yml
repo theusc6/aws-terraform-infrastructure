@@ -60,7 +60,7 @@ jobs:
       - name: Terraform Init
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
-          terraform init -backend-config="key=${ENVIRONMENT}/terraform.tfstate" -reconfigure
+          terraform init -backend-config="key=${ENVIRONMENT}/terraform.tfstate" -migrate-state
       - name: Terraform Validate
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
