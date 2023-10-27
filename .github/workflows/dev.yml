@@ -121,7 +121,9 @@ jobs:
 
       - name: Run Checkov
         run: |
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           checkov -d . --download-external-modules true --skip-check CKV_TF_1
+
 
   tflint-check:
     name: TFLint Check
@@ -156,9 +158,12 @@ jobs:
         run: tflint --init
   
       - name: Run TFLint
-        run: tflint
+        run: |
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
+          tflint
         env:
           TFLINT_LOG: trace
+
 
 
   apply:
