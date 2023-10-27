@@ -184,16 +184,15 @@ jobs:
       - name: Terraform Apply
         run: |
           set +e
-          ENVIRONMENT=dev
-          cd environments/$ENVIRONMENT
-
-          export TF_LOG=TRACE
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           
-          terraform apply -auto-approve > apply_output.txt
+          terraform apply plan.tfplan > apply_output.txt
+      
           if grep -q "Error:" apply_output.txt; then
             echo "Terraform apply failed. Check the logs for details."
             exit 1
           fi
+
 
       - name: Upload apply_output.txt as artifact
         if: always() # This ensures the step runs even if previous steps fail
