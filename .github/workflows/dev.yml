@@ -61,6 +61,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           terraform init -backend-config="key=${ENVIRONMENT}/terraform.tfstate" -migrate-state
+
       - name: Terraform Validate
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
@@ -202,6 +203,7 @@ jobs:
           set +e
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           
+          terraform init
           terraform apply plan.tfplan > apply_output.txt
       
           if grep -q "Error:" apply_output.txt; then
