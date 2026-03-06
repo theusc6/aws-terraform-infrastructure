@@ -272,13 +272,22 @@ The production workflow requires a GitHub environment named `prod-approval` with
 
 The workflows authenticate to AWS using OIDC (no long-lived keys required).
 
-| Secret | Description |
-|--------|-------------|
-| `DEV_DEPLOY_ROLE` | IAM role ARN assumed for dev deployments |
-| `STAGING_DEPLOY_ROLE` | IAM role ARN assumed for staging deployments |
-| `PROD_DEPLOY_ROLE` | IAM role ARN assumed for prod deployments |
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `DEV_DEPLOY_ROLE` | Yes | IAM role ARN assumed for dev deployments |
+| `STAGING_DEPLOY_ROLE` | Yes | IAM role ARN assumed for staging deployments |
+| `PROD_DEPLOY_ROLE` | Yes | IAM role ARN assumed for prod deployments |
+| `INFRACOST_API_KEY` | No | Infracost API key for PR cost estimates (free tier available) |
 
-Each role should be scoped to the minimum permissions needed for its environment. Using separate roles means a compromised dev pipeline cannot affect production.
+Each deploy role should be scoped to the minimum permissions needed for its environment. Using separate roles means a compromised dev pipeline cannot affect production.
+
+#### Setting up Infracost (optional but recommended)
+
+1. Sign up for a free API key at [infracost.io](https://www.infracost.io/docs/)
+2. Add `INFRACOST_API_KEY` as a repository secret in **Settings → Secrets → Actions**
+3. On the next PR, Infracost will automatically post a cost breakdown comment showing the monthly cost of every resource being added, changed, or removed
+
+If the secret is absent the cost estimate job is silently skipped — it never blocks the pipeline.
 
 ---
 

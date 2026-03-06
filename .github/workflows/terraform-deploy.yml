@@ -7,12 +7,11 @@
 #       uses: ./.github/workflows/terraform-deploy.yml
 #       with:
 #         environment: dev
-#         aws_region: us-west-2
-#         tf_version: "1.7.5"
-#         checkov_version: "3.2.73"
+#         run_apply: false
 #         require_approval: false
 #       secrets:
 #         aws_role_arn: ${{ secrets.DEV_DEPLOY_ROLE }}
+#         infracost_api_key: ${{ secrets.INFRACOST_API_KEY }}   # optional
 
 name: Terraform Deploy (Reusable)
 
@@ -52,6 +51,9 @@ on:
       aws_role_arn:
         description: 'IAM role ARN to assume via OIDC'
         required: true
+      infracost_api_key:
+        description: 'Infracost API key for cost estimation (optional — job is skipped when absent)'
+        required: false
 
 jobs:
   # ── Validate & Plan ──────────────────────────────────────────────────────────
@@ -79,6 +81,7 @@ jobs:
         uses: hashicorp/setup-terraform@v2.0.3
         with:
           terraform_version: ${{ inputs.tf_version }}
+          terraform_wrapper: false   # Must be false for Infracost JSON parsing
 
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
@@ -101,11 +104,18 @@ jobs:
             2>&1 | tee plan_output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
+      - name: Convert plan to JSON (for Infracost)
+        run: |
+          terraform -chdir=environments/${{ inputs.environment }} \
+            show -json tfplan > /tmp/plan.json
+
       - name: Upload plan artefact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.environment }}-tfplan-${{ github.run_id }}
-          path: environments/${{ inputs.environment }}/tfplan
+          path: |
+            environments/${{ inputs.environment }}/tfplan
+            /tmp/plan.json
           retention-days: 1
           if-no-files-found: error
 
@@ -129,8 +139,13 @@ jobs:
             });
 
   # ── Security Scan ────────────────────────────────────────────────────────────
+  # Checkov performs static analysis against ~1,000 AWS security policies.
+  # It checks the Terraform source files (not the plan) for misconfigurations
+  # including: missing encryption, public S3 access, open security groups,
+  # missing logging, weak IAM policies, disabled MFA, and more.
+  # https://www.checkov.io/5.Policy%20Index/terraform.html
   checkov:
-    name: Checkov (${{ inputs.environment }})
+    name: Checkov Security Scan (${{ inputs.environment }})
     needs: plan
     runs-on: ubuntu-latest
     permissions:
@@ -151,8 +166,12 @@ jobs:
         run: |
           checkov \
             --directory environments/${{ inputs.environment }} \
-            --skip-check CKV_TF_1
+            --skip-check CKV_TF_1 \
+            --compact \
+            --quiet
           # CKV_TF_1: local monorepo modules are version-controlled via git tags.
+          # --compact: show only failed checks (reduces noise in CI output)
+          # --quiet:   suppress the progress bar
 
   # ── Static Analysis ──────────────────────────────────────────────────────────
   tflint:
@@ -187,6 +206,90 @@ jobs:
       - name: Run TFLint
         run: tflint --chdir=environments/${{ inputs.environment }}
 
+  # ── Cost Estimation ───────────────────────────────────────────────────────────
+  # Infracost analyses the Terraform plan and posts a cost breakdown as a PR
+  # comment. It shows the monthly cost of every resource being added, changed,
+  # or removed — including the total diff.
+  #
+  # Setup:
+  #   1. Sign up for a free API key at https://www.infracost.io/docs/
+  #   2. Add INFRACOST_API_KEY as a GitHub repository secret
+  #   3. Pass it to this workflow as secrets.infracost_api_key
+  #
+  # If the secret is absent this job is silently skipped — it never blocks apply.
+  infracost:
+    name: Cost Estimate (${{ inputs.environment }})
+    needs: plan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Check for Infracost API key
+        id: check-key
+        run: |
+          if [ -z "$INFRACOST_API_KEY" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Infracost API key not configured — skipping cost estimate."
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          INFRACOST_API_KEY: ${{ secrets.infracost_api_key }}
+
+      - name: Configure AWS credentials (OIDC)
+        if: steps.check-key.outputs.present == 'true'
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          role-to-assume: ${{ secrets.aws_role_arn }}
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: github-actions-${{ inputs.environment }}-cost
+
+      - name: Setup Terraform ${{ inputs.tf_version }}
+        if: steps.check-key.outputs.present == 'true'
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ inputs.tf_version }}
+          terraform_wrapper: false   # Required — Infracost needs raw terraform output
+
+      - name: Terraform Init
+        if: steps.check-key.outputs.present == 'true'
+        run: |
+          terraform -chdir=environments/${{ inputs.environment }} init \
+            -backend-config="key=${{ inputs.environment }}/terraform.tfstate"
+
+      - name: Setup Infracost
+        if: steps.check-key.outputs.present == 'true'
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.infracost_api_key }}
+
+      - name: Generate cost breakdown from Terraform plan
+        if: steps.check-key.outputs.present == 'true'
+        run: |
+          infracost breakdown \
+            --path=environments/${{ inputs.environment }} \
+            --terraform-init-flags="-backend-config=key=${{ inputs.environment }}/terraform.tfstate" \
+            --format=json \
+            --out-file=/tmp/infracost.json
+
+      - name: Post cost estimate as PR comment
+        if: steps.check-key.outputs.present == 'true'
+        run: |
+          infracost comment github \
+            --path=/tmp/infracost.json \
+            --repo=${{ github.repository }} \
+            --github-token=${{ github.token }} \
+            --pull-request=${{ github.event.pull_request.number }} \
+            --behavior=update
+        # --behavior=update: replaces the previous Infracost comment instead of
+        # adding a new one on every push — keeps the PR timeline clean
+
   # ── Approval Gate (prod only) ────────────────────────────────────────────────
   # The GitHub Environment "prod-approval" must be configured in
   # Settings → Environments with at least one required reviewer.
@@ -205,12 +308,11 @@ jobs:
   # ── Apply ────────────────────────────────────────────────────────────────────
   apply:
     name: Apply (${{ inputs.environment }})
-    # For prod: wait for manual approval. For dev/staging: wait for checks only.
     needs:
       - checkov
       - tflint
       - approval
-    # approval job is skipped for dev/staging (needs skipped = needs passed for this purpose)
+    # approval is skipped for dev/staging — skipped counts as passed here
     if: |
       always() &&
       inputs.run_apply &&
@@ -237,6 +339,7 @@ jobs:
         uses: hashicorp/setup-terraform@v2.0.3
         with:
           terraform_version: ${{ inputs.tf_version }}
+          terraform_wrapper: false
 
       - name: Terraform Init
         run: |

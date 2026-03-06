@@ -41,3 +41,4 @@ jobs:
       require_approval: false
     secrets:
       aws_role_arn: ${{ secrets.DEV_DEPLOY_ROLE }}
+      infracost_api_key: ${{ secrets.INFRACOST_API_KEY }}
