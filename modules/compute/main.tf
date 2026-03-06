@@ -27,6 +27,7 @@ resource "aws_launch_template" "this" {
       volume_size           = var.root_volume_size
       volume_type           = "gp3"
       encrypted             = true
+      kms_key_id            = var.kms_key_arn  # Customer-managed key; null falls back to AWS-managed
       delete_on_termination = true
     }
   }
@@ -38,9 +39,12 @@ resource "aws_launch_template" "this" {
     }
   }
 
+  # IMDSv2 — require signed token requests for the instance metadata service.
+  # This prevents SSRF attacks from being able to reach the metadata API, which
+  # would otherwise expose the instance's IAM credentials.
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required" # Enforce IMDSv2
+    http_tokens                 = "required"
     http_put_response_hop_limit = 1
   }
 
@@ -76,14 +80,24 @@ resource "aws_autoscaling_group" "this" {
   max_size            = var.max_size
   desired_capacity    = var.desired_capacity
 
-  health_check_type         = "EC2"
-  health_check_grace_period = 300
+  # Use ELB health checks when an ALB target group is attached so that
+  # instances failing ALB health checks are replaced — not just EC2 checks.
+  health_check_type         = length(var.target_group_arns) > 0 ? "ELB" : "EC2"
+  health_check_grace_period = var.health_check_grace_period
 
+  # Pin to the specific version created by this apply rather than "$Latest".
+  # Using $Latest means an unrelated launch template update could trigger an
+  # unexpected rolling refresh outside of your planned deployment window.
   launch_template {
     id      = aws_launch_template.this.id
-    version = "$Latest"
+    version = aws_launch_template.this.latest_version
   }
 
+  # Wire up ALB target groups so the ASG registers/deregisters instances automatically.
+  target_group_arns = var.target_group_arns
+
+  # Rolling refresh replaces instances with the new launch template version in
+  # batches, ensuring at least min_healthy_percentage are healthy at all times.
   instance_refresh {
     strategy = "Rolling"
     preferences {
@@ -102,6 +116,9 @@ resource "aws_autoscaling_group" "this" {
 
   lifecycle {
     create_before_destroy = true
-    ignore_changes        = [desired_capacity]
+    # External autoscaling policies (e.g. scheduled or target-tracking) may
+    # adjust desired_capacity. Ignoring it here prevents Terraform from
+    # fighting those adjustments on every plan.
+    ignore_changes = [desired_capacity]
   }
 }

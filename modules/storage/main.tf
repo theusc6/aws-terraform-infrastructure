@@ -23,14 +23,20 @@ resource "aws_s3_bucket_versioning" "this" {
   }
 }
 
+# Server-side encryption with a customer-managed KMS key (CMK).
+# Using a CMK instead of the default aws:kms key gives you:
+#   - Full key usage audit trail in CloudTrail
+#   - Ability to revoke access instantly by disabling the key
+#   - Control over key rotation policy
 resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
   bucket = aws_s3_bucket.this.id
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "aws:kms"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = var.kms_key_arn  # null → AWS-managed key; set to CMK ARN in prod
     }
-    bucket_key_enabled = true
+    bucket_key_enabled = true  # Reduces KMS API call cost by ~99% for high-throughput buckets
   }
 }
 
@@ -107,4 +113,15 @@ resource "aws_s3_bucket_policy" "https_only" {
   })
 
   depends_on = [aws_s3_bucket_public_access_block.this]
+}
+
+# S3 server access logging records all requests made to this bucket.
+# Logs are delivered to a separate bucket to avoid recursive logging loops.
+# This satisfies CIS AWS Foundations Benchmark control 3.7.
+resource "aws_s3_bucket_logging" "this" {
+  count = var.logging_bucket_id != null ? 1 : 0
+
+  bucket        = aws_s3_bucket.this.id
+  target_bucket = var.logging_bucket_id
+  target_prefix = "${var.bucket_name}/"
 }
