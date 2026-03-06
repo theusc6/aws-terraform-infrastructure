@@ -12,6 +12,22 @@ locals {
   }
 }
 
+# Resolve the latest Amazon Linux 2023 AMI for the target region automatically.
+data "aws_ami" "amazon_linux_2023" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+}
+
 # ── Networking ────────────────────────────────────────────────────────────────
 
 module "vpc" {
@@ -54,12 +70,15 @@ module "app_sg" {
   tags = local.tags
 }
 
+# VPC Endpoint for S3 — avoids NAT gateway charges for S3 traffic.
 module "vpc_endpoint_s3" {
   source = "../../modules/networking/vpc-endpoint-module"
 
-  vpc_id        = module.vpc.vpc_id
-  service_name  = "com.amazonaws.${var.region}.s3"
-  endpoint_type = "Gateway"
+  vpc_id          = module.vpc.vpc_id
+  service_name    = "com.amazonaws.${var.region}.s3"
+  endpoint_type   = "Gateway"
+  route_table_ids = module.vpc.private_route_table_ids
+  tags            = local.tags
 }
 
 # ── IAM ──────────────────────────────────────────────────────────────────────
@@ -127,7 +146,7 @@ module "app_compute" {
   name        = "${local.environment}-app"
   environment = local.environment
 
-  ami_id               = var.ami_id
+  ami_id               = data.aws_ami.amazon_linux_2023.id
   instance_type        = "t3.medium"
   subnet_ids           = module.vpc.private_subnet_ids
   security_group_ids   = [module.app_sg.security_group_id]

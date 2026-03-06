@@ -32,3 +32,13 @@ output "public_route_table_id" {
   description = "The ID of the public route table"
   value       = aws_route_table.public.id
 }
+
+output "private_route_table_ids" {
+  description = "List of IDs of the private route tables (one per AZ when NAT GW enabled)"
+  value       = aws_route_table.private[*].id
+}
+
+output "flow_log_group_name" {
+  description = "CloudWatch Log Group name for VPC Flow Logs (empty string if disabled)"
+  value       = var.enable_flow_logs ? aws_cloudwatch_log_group.flow_logs[0].name : ""
+}

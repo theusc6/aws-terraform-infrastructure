@@ -15,7 +15,7 @@ variable "vpc_id" {
 }
 
 variable "ingress_rules" {
-  description = "List of ingress rules"
+  description = "CIDR-based ingress rules. Use ingress_sg_rules to reference other security groups."
   type = list(object({
     from_port   = number
     to_port     = number
@@ -26,8 +26,20 @@ variable "ingress_rules" {
   default = []
 }
 
+variable "ingress_sg_rules" {
+  description = "Security-group-source ingress rules. Use this instead of ingress_rules when the source is another SG."
+  type = list(object({
+    from_port                = number
+    to_port                  = number
+    protocol                 = string
+    source_security_group_id = string
+    description              = string
+  }))
+  default = []
+}
+
 variable "egress_rules" {
-  description = "List of egress rules"
+  description = "CIDR-based egress rules. Default allows all outbound — restrict this in production."
   type = list(object({
     from_port   = number
     to_port     = number

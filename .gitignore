@@ -1,0 +1,36 @@
+# Local Terraform state (never commit — use remote S3 backend)
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+
+# Terraform variable files often contain sensitive values
+terraform.tfvars
+*.auto.tfvars
+
+# Terraform working directories (generated on terraform init)
+**/.terraform/
+**/.terraform.lock.hcl
+
+# Plan output files (contain sensitive data)
+*.tfplan
+plan_output.txt
+apply_output.txt
+
+# Override files (local developer overrides, not for sharing)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Crash logs
+crash.log
+crash.*.log
+
+# macOS
+.DS_Store
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*.swo

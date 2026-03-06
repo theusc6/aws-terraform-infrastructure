@@ -1,0 +1,8 @@
+# Copy this file to terraform.tfvars and fill in the values.
+# terraform.tfvars is gitignored — never commit real values.
+
+# Your AWS account ID (12 digits, no hyphens)
+account_id = "123456789012"
+
+# AWS region — must match the region configured in your backend.tf
+region = "us-west-2"
