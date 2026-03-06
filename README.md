@@ -16,6 +16,7 @@ A production-grade, opinionated Terraform monorepo for deploying a three-tier we
 - [Security Posture](#security-posture)
 - [Makefile Reference](#makefile-reference)
 - [Branching & Release Strategy](#branching--release-strategy)
+- [Testing](#testing)
 - [Contributing](#contributing)
 - [Troubleshooting](#troubleshooting)
 
@@ -271,12 +272,13 @@ The production workflow requires a GitHub environment named `prod-approval` with
 
 The workflows authenticate to AWS using OIDC (no long-lived keys required).
 
-| Secret / Variable | Description |
-|-------------------|-------------|
-| `AWS_ROLE_ARN` | IAM role ARN to assume via OIDC |
-| `AWS_REGION` | Default AWS region (e.g. `us-west-2`) |
-| `TF_STATE_BUCKET` | S3 bucket name for Terraform state |
-| `TF_LOCK_TABLE` | DynamoDB table name for state locking |
+| Secret | Description |
+|--------|-------------|
+| `DEV_DEPLOY_ROLE` | IAM role ARN assumed for dev deployments |
+| `STAGING_DEPLOY_ROLE` | IAM role ARN assumed for staging deployments |
+| `PROD_DEPLOY_ROLE` | IAM role ARN assumed for prod deployments |
+
+Each role should be scoped to the minimum permissions needed for its environment. Using separate roles means a compromised dev pipeline cannot affect production.
 
 ---
 
@@ -351,6 +353,28 @@ main  ────────────────────────�
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide, including code style, commit message conventions, module design principles, and the pull request checklist.
+
+---
+
+## Testing
+
+This repository uses the [Terraform native test framework](https://developer.hashicorp.com/terraform/language/tests) (Terraform >= 1.6). Tests live alongside each module and use mock providers — no AWS credentials or live resources are required.
+
+```bash
+# Run all tests for a module
+terraform -chdir=modules/kms test -verbose
+terraform -chdir=modules/alb test -verbose
+terraform -chdir=modules/storage test -verbose
+terraform -chdir=modules/networking/vpc-module test -verbose
+```
+
+Each test suite validates:
+- **Variable constraints** — invalid values are correctly rejected
+- **Security defaults** — encryption, public access blocking, IMDSv2 are on by default
+- **Conditional resources** — e.g. HTTPS listener only created when `certificate_arn` is set
+- **Output wiring** — outputs reference the correct resource attributes
+
+See [`tests/README.md`](tests/README.md) for the full testing guide and instructions for writing integration tests.
 
 ---
 

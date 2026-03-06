@@ -1,4 +1,4 @@
-name: Prod Terraform CI
+name: Prod
 
 on:
   pull_request:
@@ -21,219 +21,23 @@ on:
           - plan
           - apply
 
-# Prevent concurrent deploys to the same environment.
-# For prod this is especially critical — never allow two applies to run
-# simultaneously, even if a reviewer approves a second run before the first finishes.
 concurrency:
   group: terraform-prod
   cancel-in-progress: false
 
-# Default to read-only. Individual jobs elevate only what they need.
 permissions:
   contents: read
 
-env:
-  AWS_ROLE_TO_ASSUME: ${{ secrets.PROD_DEPLOY_ROLE }}
-  AWS_REGION: "us-west-2"
-  ENVIRONMENT: prod
-  TF_VERSION: "1.7.5"
-  CHECKOV_VERSION: "3.2.73"
-
 jobs:
-  terraform:
-    name: Terraform Validate & Plan
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-      pull-requests: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4.1.0
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4.0.1
-        with:
-          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: github-actions-prod-plan
-
-      - name: Setup Terraform ${{ env.TF_VERSION }}
-        uses: hashicorp/setup-terraform@v2.0.3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-
-      - name: Terraform Format Check
-        run: terraform fmt -check -recursive
-
-      - name: Terraform Init
-        run: |
-          terraform -chdir=environments/${{ env.ENVIRONMENT }} init \
-            -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
-
-      - name: Terraform Validate
-        run: terraform -chdir=environments/${{ env.ENVIRONMENT }} validate
-
-      - name: Terraform Plan
-        id: plan
-        run: |
-          set -o pipefail
-          terraform -chdir=environments/${{ env.ENVIRONMENT }} plan \
-            -no-color \
-            -out=tfplan \
-            2>&1 | tee plan_output.txt
-
-      - name: Upload plan artefact
-        uses: actions/upload-artifact@v4
-        with:
-          name: prod-tfplan
-          path: environments/${{ env.ENVIRONMENT }}/tfplan
-          retention-days: 1
-          if-no-files-found: error
-
-      - name: Comment PR with plan output
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v6.4.1
-        with:
-          script: |
-            const fs = require('fs');
-            const outputPath = `${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}/plan_output.txt`;
-            const raw = fs.readFileSync(outputPath, 'utf8');
-            const body = raw.length > 65000
-              ? raw.substring(0, 65000) + '\n\n...[truncated — see Actions logs for full output]'
-              : raw;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## Prod — Terraform Plan\n\`\`\`\n${body}\n\`\`\``
-            });
-
-  checkov-scan:
-    name: Checkov Security Scan
-    needs: terraform
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4.1.0
-
-      - name: Setup Python
-        uses: actions/setup-python@v4.7.1
-        with:
-          python-version: '3.11'
-
-      - name: Install Checkov (pinned)
-        run: pip install checkov==${{ env.CHECKOV_VERSION }}
-
-      - name: Run Checkov
-        run: |
-          checkov \
-            --directory environments/${{ env.ENVIRONMENT }} \
-            --skip-check CKV_TF_1
-
-  tflint-check:
-    name: TFLint Check
-    needs: terraform
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4.1.0
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4.0.1
-        with:
-          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: github-actions-prod-lint
-
-      - name: Install TFLint
-        run: |
-          curl -sL \
-            https://github.com/terraform-linters/tflint/releases/download/v0.50.3/tflint_linux_amd64.zip \
-            -o tflint.zip
-          unzip tflint.zip
-          sudo mv tflint /usr/local/bin/
-
-      - name: TFLint Init
-        run: tflint --init
-
-      - name: Run TFLint
-        run: tflint --chdir=environments/${{ env.ENVIRONMENT }}
-
-  # This job uses the GitHub Environment "prod-approval" which must be configured
-  # in Settings → Environments with at least one required reviewer.
-  # The workflow pauses here until an authorised reviewer approves the deployment.
-  # Required status checks (terraform, checkov-scan, tflint-check) must pass first.
-  approval-gate:
-    name: Await Deployment Approval
-    needs: [checkov-scan, tflint-check]
-    runs-on: ubuntu-latest
-    if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/prod-')) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
-    environment: prod-approval
-    permissions:
-      contents: read
-    steps:
-      - name: Deployment approved
-        run: echo "Deployment to production approved by ${{ github.actor }}. Proceeding."
-
-  apply:
-    name: Apply Terraform
-    needs: [approval-gate]
-    runs-on: ubuntu-latest
-    environment: prod
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4.1.0
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4.0.1
-        with:
-          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: github-actions-prod-apply
-
-      - name: Setup Terraform ${{ env.TF_VERSION }}
-        uses: hashicorp/setup-terraform@v2.0.3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-
-      - name: Terraform Init
-        run: |
-          terraform -chdir=environments/${{ env.ENVIRONMENT }} init \
-            -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
-
-      # Generate a fresh plan immediately before apply.
-      # An approval can sit for hours before being actioned. A fresh plan ensures
-      # we apply exactly the current diff, not something computed before approval.
-      - name: Terraform Plan (pre-apply)
-        run: |
-          terraform -chdir=environments/${{ env.ENVIRONMENT }} plan \
-            -no-color \
-            -out=tfplan
-
-      - name: Terraform Apply
-        run: terraform -chdir=environments/${{ env.ENVIRONMENT }} apply tfplan
-
-      - name: Capture outputs
-        if: always()
-        run: |
-          terraform -chdir=environments/${{ env.ENVIRONMENT }} output -no-color \
-            > environments/${{ env.ENVIRONMENT }}/apply_output.txt 2>&1 || true
-
-      - name: Upload apply artefact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: prod-apply-output
-          path: environments/${{ env.ENVIRONMENT }}/apply_output.txt
-          retention-days: 90
+  deploy:
+    uses: ./.github/workflows/terraform-deploy.yml
+    with:
+      environment: prod
+      run_apply: |
+        ${{
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/prod-')) ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+        }}
+      require_approval: true
+    secrets:
+      aws_role_arn: ${{ secrets.PROD_DEPLOY_ROLE }}
