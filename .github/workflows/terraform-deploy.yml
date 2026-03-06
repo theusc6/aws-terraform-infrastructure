@@ -1,0 +1,269 @@
+# Reusable Terraform deployment workflow.
+# Called by dev.yml, staging.yml, and prod.yml — not triggered directly.
+#
+# Usage:
+#   jobs:
+#     deploy:
+#       uses: ./.github/workflows/terraform-deploy.yml
+#       with:
+#         environment: dev
+#         aws_region: us-west-2
+#         tf_version: "1.7.5"
+#         checkov_version: "3.2.73"
+#         require_approval: false
+#       secrets:
+#         aws_role_arn: ${{ secrets.DEV_DEPLOY_ROLE }}
+
+name: Terraform Deploy (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment (dev, staging, prod)'
+        required: true
+        type: string
+      aws_region:
+        description: 'AWS region'
+        required: false
+        type: string
+        default: 'us-west-2'
+      tf_version:
+        description: 'Terraform version to use'
+        required: false
+        type: string
+        default: '1.7.5'
+      checkov_version:
+        description: 'Checkov version to use'
+        required: false
+        type: string
+        default: '3.2.73'
+      run_apply:
+        description: 'Whether to run terraform apply after validation'
+        required: false
+        type: boolean
+        default: false
+      require_approval:
+        description: 'Whether to require manual approval before apply (prod)'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      aws_role_arn:
+        description: 'IAM role ARN to assume via OIDC'
+        required: true
+
+jobs:
+  # ── Validate & Plan ──────────────────────────────────────────────────────────
+  plan:
+    name: Plan (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    outputs:
+      plan_exit_code: ${{ steps.plan.outputs.exit_code }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          role-to-assume: ${{ secrets.aws_role_arn }}
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: github-actions-${{ inputs.environment }}-plan
+
+      - name: Setup Terraform ${{ inputs.tf_version }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ inputs.tf_version }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        run: |
+          terraform -chdir=environments/${{ inputs.environment }} init \
+            -backend-config="key=${{ inputs.environment }}/terraform.tfstate"
+
+      - name: Terraform Validate
+        run: terraform -chdir=environments/${{ inputs.environment }} validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          set -o pipefail
+          terraform -chdir=environments/${{ inputs.environment }} plan \
+            -no-color \
+            -out=tfplan \
+            2>&1 | tee plan_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload plan artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.environment }}-tfplan-${{ github.run_id }}
+          path: environments/${{ inputs.environment }}/tfplan
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Comment PR with plan output
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6.4.1
+        with:
+          script: |
+            const fs = require('fs');
+            const env = '${{ inputs.environment }}';
+            const outputPath = `${{ github.workspace }}/environments/${env}/plan_output.txt`;
+            const raw = fs.readFileSync(outputPath, 'utf8');
+            const body = raw.length > 65000
+              ? raw.substring(0, 65000) + '\n\n...[truncated — see Actions logs for full output]'
+              : raw;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ${env.charAt(0).toUpperCase() + env.slice(1)} — Terraform Plan\n\`\`\`\n${body}\n\`\`\``
+            });
+
+  # ── Security Scan ────────────────────────────────────────────────────────────
+  checkov:
+    name: Checkov (${{ inputs.environment }})
+    needs: plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4.7.1
+        with:
+          python-version: '3.11'
+
+      - name: Install Checkov (pinned)
+        run: pip install checkov==${{ inputs.checkov_version }}
+
+      - name: Run Checkov
+        run: |
+          checkov \
+            --directory environments/${{ inputs.environment }} \
+            --skip-check CKV_TF_1
+          # CKV_TF_1: local monorepo modules are version-controlled via git tags.
+
+  # ── Static Analysis ──────────────────────────────────────────────────────────
+  tflint:
+    name: TFLint (${{ inputs.environment }})
+    needs: plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          role-to-assume: ${{ secrets.aws_role_arn }}
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: github-actions-${{ inputs.environment }}-lint
+
+      - name: Install TFLint
+        run: |
+          curl -sL \
+            https://github.com/terraform-linters/tflint/releases/download/v0.50.3/tflint_linux_amd64.zip \
+            -o tflint.zip
+          unzip tflint.zip
+          sudo mv tflint /usr/local/bin/
+
+      - name: TFLint Init
+        run: tflint --init
+
+      - name: Run TFLint
+        run: tflint --chdir=environments/${{ inputs.environment }}
+
+  # ── Approval Gate (prod only) ────────────────────────────────────────────────
+  # The GitHub Environment "prod-approval" must be configured in
+  # Settings → Environments with at least one required reviewer.
+  approval:
+    name: Await Approval (${{ inputs.environment }})
+    needs: [checkov, tflint]
+    runs-on: ubuntu-latest
+    if: inputs.run_apply && inputs.require_approval
+    environment: prod-approval
+    permissions:
+      contents: read
+    steps:
+      - name: Approved
+        run: echo "Deployment to ${{ inputs.environment }} approved by ${{ github.actor }}."
+
+  # ── Apply ────────────────────────────────────────────────────────────────────
+  apply:
+    name: Apply (${{ inputs.environment }})
+    # For prod: wait for manual approval. For dev/staging: wait for checks only.
+    needs:
+      - checkov
+      - tflint
+      - approval
+    # approval job is skipped for dev/staging (needs skipped = needs passed for this purpose)
+    if: |
+      always() &&
+      inputs.run_apply &&
+      needs.checkov.result == 'success' &&
+      needs.tflint.result == 'success' &&
+      (needs.approval.result == 'success' || needs.approval.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          role-to-assume: ${{ secrets.aws_role_arn }}
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: github-actions-${{ inputs.environment }}-apply
+
+      - name: Setup Terraform ${{ inputs.tf_version }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ inputs.tf_version }}
+
+      - name: Terraform Init
+        run: |
+          terraform -chdir=environments/${{ inputs.environment }} init \
+            -backend-config="key=${{ inputs.environment }}/terraform.tfstate"
+
+      # Generate a fresh plan immediately before apply.
+      # The plan from the check stage may be stale if approval took time.
+      - name: Terraform Plan (pre-apply)
+        run: |
+          terraform -chdir=environments/${{ inputs.environment }} plan \
+            -no-color \
+            -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform -chdir=environments/${{ inputs.environment }} apply tfplan
+
+      - name: Capture outputs
+        if: always()
+        run: |
+          terraform -chdir=environments/${{ inputs.environment }} output -no-color \
+            > environments/${{ inputs.environment }}/apply_output.txt 2>&1 || true
+
+      - name: Upload apply artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.environment }}-apply-${{ github.run_id }}
+          path: environments/${{ inputs.environment }}/apply_output.txt
+          retention-days: ${{ inputs.environment == 'prod' && 90 || 30 }}
