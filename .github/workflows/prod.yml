@@ -1,16 +1,15 @@
-name: Terraform CI
+name: Prod Terraform CI
 
 on:
   pull_request:
     paths:
       - 'environments/prod/**.tf'
+      - 'modules/**/*.tf'
     branches:
       - main
   push:
     tags:
       - 'prod-*'
-    paths:
-      - '**.tf'
 
 permissions:
   id-token: write
@@ -23,88 +22,63 @@ env:
   AWS_ROLE_TO_ASSUME: ${{ secrets.PROD_DEPLOY_ROLE }}
   AWS_REGION: "us-west-2"
   SECRET_KEY: ${{ secrets.GITHUB_TOKEN }}
+  ENVIRONMENT: prod
 
 jobs:
-
-  debug:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Print event name and ref
-        run: |
-          echo "Event Name: ${{ github.event_name }}"
-          echo "Ref: ${{ github.ref }}"
-
   terraform:
-    name: Terraform
+    name: Terraform Validate & Plan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.1.0
         with:
           token: ${{ env.SECRET_KEY }}
 
-      - name: Determine Environment from Branch or Tag
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "ENVIRONMENT=prod" >> $GITHUB_ENV # Default environment for pull requests
-          else
-            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
-          fi
-
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: github-actions-session
+          role-session-name: github-actions-prod-session
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2.0.3
 
       - name: Terraform Format
-        run: terraform fmt -check
+        run: terraform fmt -check -recursive
 
       - name: Terraform Init
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           terraform init -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
+
       - name: Terraform Validate
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           terraform validate
-
-      - name: Print working directory
-        run: pwd
-
-      - name: List files in current directory
-        run: ls -al
-
-      - name: Print environment variables
-        run: printenv
 
       - name: Terraform Plan
         id: terraform-plan
         if: github.event_name == 'pull_request'
         run: |
           cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
-          terraform plan -out=plan.tfplan -no-color > plan_output.txt
-
-      # Diagnostic step to list directory contents
-      - name: List directory contents
-        run: ls -al
+          terraform plan -no-color 2>&1 | tee plan_output.txt
 
       - name: Comment PR with Plan Result
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v6.4.1
         with:
           script: |
-            var fs = require('fs');
-            var outputFilePath = `${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}/plan_output.txt`;
-            var output = fs.readFileSync(outputFilePath, 'utf8');
+            const fs = require('fs');
+            const outputFilePath = `${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}/plan_output.txt`;
+            const output = fs.readFileSync(outputFilePath, 'utf8');
+            const truncated = output.length > 65000
+              ? output.substring(0, 65000) + '\n\n... [truncated — see Actions logs for full output]'
+              : output;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: output
+              body: `## Prod Terraform Plan\n\`\`\`\n${truncated}\n\`\`\``
             });
 
   checkov-scan:
@@ -114,8 +88,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
-        with:
-          token: ${{ env.SECRET_KEY }}
 
       - name: Set up Python
         uses: actions/setup-python@v4.7.1
@@ -127,6 +99,7 @@ jobs:
 
       - name: Run Checkov
         run: |
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
           checkov -d . --download-external-modules true --skip-check CKV_TF_1
 
   tflint-check:
@@ -136,64 +109,73 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
-        with:
-          token: ${{ env.SECRET_KEY }}
-    
+
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: github-actions-session
-    
+          role-session-name: github-actions-prod-session
+
       - name: Install TFLint
         run: |
-          wget https://github.com/terraform-linters/tflint/releases/download/v0.34.0/tflint_linux_amd64.zip
+          wget https://github.com/terraform-linters/tflint/releases/download/v0.48.0/tflint_linux_amd64.zip
           unzip tflint_linux_amd64.zip
           sudo mv tflint /usr/local/bin/
-    
-      - name: Initialize TFLint AWS Plugin
+
+      - name: Install TFLint AWS Plugin
+        run: |
+          mkdir -p ~/.tflint.d/plugins
+          wget https://github.com/terraform-linters/tflint-ruleset-aws/releases/download/v0.27.0/tflint-ruleset-aws_linux_amd64.zip
+          unzip tflint-ruleset-aws_linux_amd64.zip -d ~/.tflint.d/plugins/
+
+      - name: Initialize TFLint
         run: tflint --init
-    
+
       - name: Run TFLint
-        run: tflint --loglevel debug
+        run: |
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
+          tflint
 
   apply:
     name: Apply Terraform
     needs: [checkov-scan, tflint-check]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.ref, 'refs/tags/prod-') && contains(github.event.head_commit.modified, 'environments/prod/')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/prod-')
+    environment: prod
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
         with:
           token: ${{ env.SECRET_KEY }}
 
-      - name: Determine Environment from Branch or Tag
-        run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "ENVIRONMENT=prod" >> $GITHUB_ENV
-          else
-            echo "ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)" >> $GITHUB_ENV
-          fi
-
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: github-actions-session
+          role-session-name: github-actions-prod-session
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2.0.3
 
+      - name: Terraform Init
+        run: |
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
+          terraform init -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
+
       - name: Terraform Apply
         run: |
-          set +e
-          ENVIRONMENT=$(echo ${{ github.ref }} | sed -e 's,refs/tags/,,g' | cut -d'-' -f1)
-          cd environments/$ENVIRONMENT
-          terraform apply -auto-approve > apply_output.txt
+          cd ${{ github.workspace }}/environments/${{ env.ENVIRONMENT }}
+          terraform apply -auto-approve 2>&1 | tee apply_output.txt
           if grep -q "Error:" apply_output.txt; then
             echo "Terraform apply failed. Check the logs for details."
             exit 1
           fi
+
+      - name: Upload apply output
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: prod-apply-output
+          path: environments/prod/apply_output.txt
