@@ -1,5 +1,5 @@
 variable "region" {
-  description = "AWS region to deploy into"
+  description = "AWS region to deploy into."
   type        = string
   default     = "us-west-2"
 
@@ -10,11 +10,23 @@ variable "region" {
 }
 
 variable "account_id" {
-  description = "AWS account ID — used to ensure globally unique S3 bucket names"
+  description = "AWS account ID — used to ensure globally unique S3 bucket names."
   type        = string
 
   validation {
     condition     = can(regex("^[0-9]{12}$", var.account_id))
     error_message = "account_id must be a 12-digit AWS account ID."
   }
+}
+
+variable "certificate_arn" {
+  description = "ACM certificate ARN for HTTPS. Required for production — the ALB will redirect HTTP to HTTPS. Provision via aws_acm_certificate or import an existing cert."
+  type        = string
+  default     = null
+}
+
+variable "alarm_email" {
+  description = "Email address to receive CloudWatch alarm notifications. A confirmation email will be sent to this address."
+  type        = string
+  default     = null
 }

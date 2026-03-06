@@ -4,5 +4,12 @@
 # Your AWS account ID (12 digits, no hyphens)
 account_id = "123456789012"
 
-# AWS region — must match the region configured in your backend.tf
+# AWS region — must match the region configured in backend.tf
 region = "us-west-2"
+
+# ACM certificate ARN for HTTPS (required for production).
+# Provision via the AWS Console, CLI, or an aws_acm_certificate resource.
+certificate_arn = "arn:aws:acm:us-west-2:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Email for CloudWatch alarm notifications. A confirmation email will be sent.
+alarm_email = "ops-team@example.com"
