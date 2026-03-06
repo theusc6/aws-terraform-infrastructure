@@ -50,6 +50,18 @@ variable "enable_dns_support" {
   default     = true
 }
 
+variable "enable_flow_logs" {
+  description = "Enable VPC Flow Logs to CloudWatch Logs (recommended for all environments)"
+  type        = bool
+  default     = true
+}
+
+variable "flow_logs_retention_days" {
+  description = "Number of days to retain VPC Flow Log entries in CloudWatch"
+  type        = number
+  default     = 30
+}
+
 variable "tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)

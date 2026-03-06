@@ -3,6 +3,7 @@ resource "aws_security_group" "this" {
   description = var.description
   vpc_id      = var.vpc_id
 
+  # CIDR-based ingress rules (e.g. allow traffic from a known IP range)
   dynamic "ingress" {
     for_each = var.ingress_rules
     content {
@@ -11,6 +12,18 @@ resource "aws_security_group" "this" {
       protocol    = ingress.value.protocol
       cidr_blocks = ingress.value.cidr_blocks
       description = ingress.value.description
+    }
+  }
+
+  # Security-group-source ingress rules (e.g. allow traffic from an ALB SG)
+  dynamic "ingress" {
+    for_each = var.ingress_sg_rules
+    content {
+      from_port                = ingress.value.from_port
+      to_port                  = ingress.value.to_port
+      protocol                 = ingress.value.protocol
+      security_groups          = [ingress.value.source_security_group_id]
+      description              = ingress.value.description
     }
   }
 
