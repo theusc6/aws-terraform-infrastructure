@@ -2,24 +2,29 @@
 # Usage: make <target> ENV=<dev|staging|prod>
 #
 # Prerequisites:
-#   - Terraform >= 0.14 installed
-#   - AWS CLI configured (or OIDC role assumed)
+#   - Terraform >= 1.3.0 installed
+#   - AWS CLI configured (or OIDC role assumed via CI)
 #   - ENV variable set (defaults to dev)
 
 ENV ?= dev
 TF_DIR := environments/$(ENV)
 TF  := terraform -chdir=$(TF_DIR)
 
-.PHONY: help init validate fmt plan apply destroy lint security-scan bootstrap
+.PHONY: help bootstrap init validate fmt fmt-check plan apply destroy \
+        lint security-scan test output clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  ENV defaults to 'dev'. Override with: make <target> ENV=staging"
 
+# ── Backend ───────────────────────────────────────────────────────────────────
+
 bootstrap: ## Bootstrap S3 backend and DynamoDB lock table (run once per account)
 	@bash scripts/setup-backend.sh
+
+# ── Core workflow ─────────────────────────────────────────────────────────────
 
 init: ## Initialise Terraform for the selected environment
 	$(TF) init -backend-config="key=$(ENV)/terraform.tfstate"
@@ -27,10 +32,10 @@ init: ## Initialise Terraform for the selected environment
 validate: init ## Validate Terraform configuration
 	$(TF) validate
 
-fmt: ## Format all Terraform files
+fmt: ## Format all Terraform files recursively
 	terraform fmt -recursive
 
-fmt-check: ## Check formatting without modifying files
+fmt-check: ## Check formatting without modifying files (same check as CI)
 	terraform fmt -check -recursive
 
 plan: init ## Generate and display an execution plan
@@ -43,20 +48,39 @@ apply: init ## Apply the last plan (or auto-approve if no plan file)
 		$(TF) apply -auto-approve; \
 	fi
 
-destroy: init ## Destroy all resources in the selected environment (use with caution!)
-	@echo "⚠️  WARNING: This will destroy ALL resources in the '$(ENV)' environment."
+destroy: init ## Destroy all resources in the selected environment (confirmation required)
+	@echo "WARNING: This will destroy ALL resources in the '$(ENV)' environment."
 	@read -p "Type the environment name to confirm: " confirm; \
 		[ "$$confirm" = "$(ENV)" ] || (echo "Aborted." && exit 1)
 	$(TF) destroy -auto-approve
 
+# ── Quality checks ────────────────────────────────────────────────────────────
+
 lint: ## Run TFLint against the selected environment
 	@which tflint > /dev/null || (echo "tflint not found — install from https://github.com/terraform-linters/tflint" && exit 1)
 	tflint --init
-	cd $(TF_DIR) && tflint
+	tflint --chdir=$(TF_DIR)
 
 security-scan: ## Run Checkov security scan against the selected environment
 	@which checkov > /dev/null || pip install checkov
-	checkov -d $(TF_DIR) --download-external-modules true --skip-check CKV_TF_1
+	checkov --directory $(TF_DIR) --skip-check CKV_TF_1 --compact --quiet
+
+test: ## Run Terraform native unit tests for all modules (no AWS credentials required)
+	@echo "Running module tests..."
+	@for module in \
+		modules/kms \
+		modules/storage \
+		modules/alb \
+		modules/networking/vpc-module; do \
+		echo ""; \
+		echo "==> $$module"; \
+		terraform -chdir=$$module init -backend=false > /dev/null 2>&1; \
+		terraform -chdir=$$module test -verbose || exit 1; \
+	done
+	@echo ""
+	@echo "All module tests passed."
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
 
 output: init ## Print Terraform outputs for the selected environment
 	$(TF) output

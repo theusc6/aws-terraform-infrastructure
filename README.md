@@ -1,5 +1,10 @@
 # AWS Terraform Infrastructure
 
+![Module Tests](https://github.com/theusc6/aws-terraform-infrastructure/actions/workflows/module-tests.yml/badge.svg)
+![Drift Detection](https://github.com/theusc6/aws-terraform-infrastructure/actions/workflows/drift-detection.yml/badge.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.3.0-7B42BC)](https://developer.hashicorp.com/terraform)
+
 A production-grade, opinionated Terraform monorepo for deploying a three-tier web application stack on AWS. The repository ships a complete set of reusable modules, three fully-configured environments (dev / staging / prod), and a GitHub Actions CI/CD pipeline that automatically plans on every pull request and applies on environment-specific git tags.
 
 ---
@@ -367,15 +372,24 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide, includin
 
 ## Testing
 
-This repository uses the [Terraform native test framework](https://developer.hashicorp.com/terraform/language/tests) (Terraform >= 1.6). Tests live alongside each module and use mock providers — no AWS credentials or live resources are required.
+This repository uses the [Terraform native test framework](https://developer.hashicorp.com/terraform/language/tests) (Terraform >= 1.6). Tests live alongside each module and use mock providers — **no AWS credentials or live resources required**.
+
+### Run locally
 
 ```bash
-# Run all tests for a module
+# Run all module tests at once
+make test
+
+# Run tests for a specific module
 terraform -chdir=modules/kms test -verbose
 terraform -chdir=modules/alb test -verbose
 terraform -chdir=modules/storage test -verbose
 terraform -chdir=modules/networking/vpc-module test -verbose
 ```
+
+### CI
+
+The `module-tests.yml` workflow runs automatically on every PR and push to `main` that touches `modules/**`. It detects which modules changed and only tests those — keeping CI fast. A summary job (`Module Tests Passed`) is available as a required branch protection status check.
 
 Each test suite validates:
 - **Variable constraints** — invalid values are correctly rejected
