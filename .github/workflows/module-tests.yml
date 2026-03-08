@@ -1,0 +1,182 @@
+name: Module Tests
+
+# Run Terraform native tests on every module that has changed.
+# Tests use mock providers — no AWS credentials or live resources required.
+# See tests/README.md for the testing strategy and how to add new tests.
+
+on:
+  pull_request:
+    paths:
+      - 'modules/**'
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    paths:
+      - 'modules/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: "1.7.5"
+
+jobs:
+  # Detect which modules have changed so we only test what's relevant.
+  # On workflow_dispatch (manual run) we test everything.
+  detect-changes:
+    name: Detect Changed Modules
+    runs-on: ubuntu-latest
+    outputs:
+      alb:        ${{ steps.changes.outputs.alb }}
+      compute:    ${{ steps.changes.outputs.compute }}
+      iam:        ${{ steps.changes.outputs.iam }}
+      kms:        ${{ steps.changes.outputs.kms }}
+      monitoring: ${{ steps.changes.outputs.monitoring }}
+      storage:    ${{ steps.changes.outputs.storage }}
+      vpc:        ${{ steps.changes.outputs.vpc }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Detect changed modules
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual run — test everything
+            echo "alb=true"        >> "$GITHUB_OUTPUT"
+            echo "compute=true"    >> "$GITHUB_OUTPUT"
+            echo "iam=true"        >> "$GITHUB_OUTPUT"
+            echo "kms=true"        >> "$GITHUB_OUTPUT"
+            echo "monitoring=true" >> "$GITHUB_OUTPUT"
+            echo "storage=true"    >> "$GITHUB_OUTPUT"
+            echo "vpc=true"        >> "$GITHUB_OUTPUT"
+          else
+            BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+            HEAD="${{ github.event.pull_request.head.sha || github.sha }}"
+            CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+            echo "$CHANGED"
+
+            grep -q "^modules/alb/"                          <<< "$CHANGED" && echo "alb=true"        >> "$GITHUB_OUTPUT" || echo "alb=false"        >> "$GITHUB_OUTPUT"
+            grep -q "^modules/compute/"                      <<< "$CHANGED" && echo "compute=true"    >> "$GITHUB_OUTPUT" || echo "compute=false"    >> "$GITHUB_OUTPUT"
+            grep -q "^modules/iam/"                          <<< "$CHANGED" && echo "iam=true"        >> "$GITHUB_OUTPUT" || echo "iam=false"        >> "$GITHUB_OUTPUT"
+            grep -q "^modules/kms/"                          <<< "$CHANGED" && echo "kms=true"        >> "$GITHUB_OUTPUT" || echo "kms=false"        >> "$GITHUB_OUTPUT"
+            grep -q "^modules/monitoring/"                   <<< "$CHANGED" && echo "monitoring=true" >> "$GITHUB_OUTPUT" || echo "monitoring=false" >> "$GITHUB_OUTPUT"
+            grep -q "^modules/storage/"                      <<< "$CHANGED" && echo "storage=true"    >> "$GITHUB_OUTPUT" || echo "storage=false"    >> "$GITHUB_OUTPUT"
+            grep -q "^modules/networking/vpc-module/"        <<< "$CHANGED" && echo "vpc=true"        >> "$GITHUB_OUTPUT" || echo "vpc=false"        >> "$GITHUB_OUTPUT"
+          fi
+
+  test-kms:
+    name: Test — modules/kms
+    needs: detect-changes
+    if: needs.detect-changes.outputs.kms == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/kms init
+
+      - name: Run tests
+        run: terraform -chdir=modules/kms test -verbose
+
+  test-storage:
+    name: Test — modules/storage
+    needs: detect-changes
+    if: needs.detect-changes.outputs.storage == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/storage init
+
+      - name: Run tests
+        run: terraform -chdir=modules/storage test -verbose
+
+  test-alb:
+    name: Test — modules/alb
+    needs: detect-changes
+    if: needs.detect-changes.outputs.alb == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/alb init
+
+      - name: Run tests
+        run: terraform -chdir=modules/alb test -verbose
+
+  test-vpc:
+    name: Test — modules/networking/vpc-module
+    needs: detect-changes
+    if: needs.detect-changes.outputs.vpc == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/networking/vpc-module init
+
+      - name: Run tests
+        run: terraform -chdir=modules/networking/vpc-module test -verbose
+
+  # Summary job: required status check that passes when all relevant tests pass.
+  # Set this as a required PR check in branch protection rules.
+  # It passes even when no modules changed (all test jobs were skipped).
+  tests-passed:
+    name: Module Tests Passed
+    needs: [test-kms, test-storage, test-alb, test-vpc]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          results=(
+            "${{ needs.test-kms.result }}"
+            "${{ needs.test-storage.result }}"
+            "${{ needs.test-alb.result }}"
+            "${{ needs.test-vpc.result }}"
+          )
+          for result in "${results[@]}"; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "One or more module tests failed: ${results[*]}"
+              exit 1
+            fi
+          done
+          echo "All module tests passed (or were skipped — no changes detected)."
