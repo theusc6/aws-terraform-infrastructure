@@ -33,11 +33,7 @@ jobs:
     uses: ./.github/workflows/terraform-deploy.yml
     with:
       environment: prod
-      run_apply: |
-        ${{
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/prod-')) ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
-        }}
+      run_apply: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/prod-')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply') }}
       require_approval: true
     secrets:
       aws_role_arn: ${{ secrets.PROD_DEPLOY_ROLE }}

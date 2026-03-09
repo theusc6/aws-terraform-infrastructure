@@ -33,11 +33,7 @@ jobs:
     uses: ./.github/workflows/terraform-deploy.yml
     with:
       environment: staging
-      run_apply: |
-        ${{
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/staging-')) ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
-        }}
+      run_apply: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/staging-')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply') }}
       require_approval: false
     secrets:
       aws_role_arn: ${{ secrets.STAGING_DEPLOY_ROLE }}
