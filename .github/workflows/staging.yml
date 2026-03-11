@@ -38,3 +38,4 @@ jobs:
     secrets:
       aws_role_arn: ${{ secrets.STAGING_DEPLOY_ROLE }}
       infracost_api_key: ${{ secrets.INFRACOST_API_KEY }}
+      aws_account_id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
