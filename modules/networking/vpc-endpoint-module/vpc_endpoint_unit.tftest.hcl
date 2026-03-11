@@ -9,9 +9,9 @@ run "interface_endpoint_uses_sg_and_subnets" {
   command = plan
 
   variables {
-    vpc_id        = "vpc-12345678"
-    service_name  = "com.amazonaws.us-west-2.ssm"
-    endpoint_type = "Interface"
+    vpc_id             = "vpc-12345678"
+    service_name       = "com.amazonaws.us-west-2.ssm"
+    endpoint_type      = "Interface"
     security_group_ids = ["sg-11111111"]
     subnet_ids         = ["subnet-aaaaaaaa", "subnet-bbbbbbbb"]
   }
