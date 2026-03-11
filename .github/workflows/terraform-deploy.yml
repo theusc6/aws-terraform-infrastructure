@@ -54,6 +54,9 @@ on:
       infracost_api_key:
         description: 'Infracost API key for cost estimation (optional — job is skipped when absent)'
         required: false
+      aws_account_id:
+        description: 'AWS account ID for the target environment — sets TF_VAR_account_id'
+        required: true
 
 jobs:
   # ── Validate & Plan ──────────────────────────────────────────────────────────
@@ -64,6 +67,8 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
+    env:
+      TF_VAR_account_id: ${{ secrets.aws_account_id }}
     outputs:
       plan_exit_code: ${{ steps.plan.outputs.exit_code }}
     steps:
@@ -321,6 +326,8 @@ jobs:
       (needs.approval.result == 'success' || needs.approval.result == 'skipped')
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    env:
+      TF_VAR_account_id: ${{ secrets.aws_account_id }}
     permissions:
       contents: read
       id-token: write
