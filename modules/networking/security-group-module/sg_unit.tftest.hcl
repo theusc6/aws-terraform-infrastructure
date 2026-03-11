@@ -38,7 +38,7 @@ run "managed_by_tag_always_present" {
 # ── Test: no ingress rules by default ─────────────────────────────────────────
 
 run "no_ingress_rules_by_default" {
-  command = plan
+  command = apply
 
   variables {
     name   = "test-sg"
@@ -54,7 +54,7 @@ run "no_ingress_rules_by_default" {
 # ── Test: default egress allows all outbound ──────────────────────────────────
 
 run "default_egress_allows_all" {
-  command = plan
+  command = apply
 
   variables {
     name   = "test-sg"
@@ -80,7 +80,7 @@ run "default_egress_allows_all" {
 # ── Test: CIDR-based ingress rules are counted correctly ──────────────────────
 
 run "ingress_cidr_rules_counted" {
-  command = plan
+  command = apply
 
   variables {
     name   = "test-sg"
@@ -112,7 +112,7 @@ run "ingress_cidr_rules_counted" {
 # ── Test: SG-source ingress rules are counted correctly ───────────────────────
 
 run "ingress_sg_rules_counted" {
-  command = plan
+  command = apply
 
   variables {
     name   = "test-sg"
