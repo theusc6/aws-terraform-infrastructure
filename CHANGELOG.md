@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] — 2026-03-11
+
 ### Added
 - `modules/networking/security-group-module` — added `sg_unit.tftest.hcl` with six tests covering name wiring, ManagedBy tag enforcement, no default ingress, default egress protocol/CIDR, CIDR-based ingress rule count, and SG-sourced ingress rule count.
 - `modules/networking/vpc-endpoint-module` — added `vpc_endpoint_unit.tftest.hcl` with four tests covering Interface endpoint SG/subnet wiring, Gateway endpoint route-table wiring, invalid `endpoint_type` rejection via `expect_failures`, and ManagedBy tag enforcement.
@@ -59,5 +63,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 - `.tflint.hcl` — TFLint configuration with AWS plugin enabled.
 - `.gitignore` — Excludes state files, `.terraform` directories, plan outputs, and secrets.
 
-[Unreleased]: https://github.com/<org>/aws-terraform-infrastructure/compare/prod-v1.0.0...HEAD
-[1.0.0]: https://github.com/<org>/aws-terraform-infrastructure/releases/tag/prod-v1.0.0
+[Unreleased]: https://github.com/theusc6/aws-terraform-infrastructure/compare/prod-v1.1.0...HEAD
+[1.1.0]: https://github.com/theusc6/aws-terraform-infrastructure/compare/prod-v1.0.0...prod-v1.1.0
+[1.0.0]: https://github.com/theusc6/aws-terraform-infrastructure/releases/tag/prod-v1.0.0
