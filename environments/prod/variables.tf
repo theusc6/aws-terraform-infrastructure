@@ -22,7 +22,11 @@ variable "account_id" {
 variable "certificate_arn" {
   description = "ACM certificate ARN for HTTPS. Required for production — the ALB will redirect HTTP to HTTPS. Provision via aws_acm_certificate or import an existing cert."
   type        = string
-  default     = null
+
+  validation {
+    condition     = can(regex("^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate/[a-f0-9-]+$", var.certificate_arn))
+    error_message = "certificate_arn must be a valid ACM certificate ARN (arn:aws:acm:<region>:<account>:certificate/<id>). HTTPS is required in production."
+  }
 }
 
 variable "alarm_email" {

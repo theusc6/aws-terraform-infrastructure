@@ -45,8 +45,13 @@ run "https_only_policy_applied" {
   }
 
   assert {
-    condition     = aws_s3_bucket_policy.https_only != null
-    error_message = "HTTPS-only policy resource must be created."
+    condition     = jsondecode(aws_s3_bucket_policy.https_only.policy).Statement[0].Effect == "Deny"
+    error_message = "HTTPS-only policy must have a Deny effect."
+  }
+
+  assert {
+    condition     = jsondecode(aws_s3_bucket_policy.https_only.policy).Statement[0].Condition.Bool["aws:SecureTransport"] == "false"
+    error_message = "HTTPS-only policy must deny requests where aws:SecureTransport is false."
   }
 }
 

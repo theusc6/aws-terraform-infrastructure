@@ -9,6 +9,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 ## [Unreleased]
 
 ### Added
+- `modules/networking/security-group-module` — added `sg_unit.tftest.hcl` with six tests covering name wiring, ManagedBy tag enforcement, no default ingress, default egress protocol/CIDR, CIDR-based ingress rule count, and SG-sourced ingress rule count.
+- `modules/networking/vpc-endpoint-module` — added `vpc_endpoint_unit.tftest.hcl` with four tests covering Interface endpoint SG/subnet wiring, Gateway endpoint route-table wiring, invalid `endpoint_type` rejection via `expect_failures`, and ManagedBy tag enforcement.
 - Full documentation suite: root README, CONTRIBUTING guide, and per-module READMEs for all nine modules.
 - `modules/alb` — Application Load Balancer module with HTTP→HTTPS redirect, configurable SSL policy, deregistration delay, and deletion protection.
 - `modules/kms` — Customer-managed KMS key module with automatic annual rotation, least-privilege default key policy, and multi-region support.
@@ -16,6 +18,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 - `CONTRIBUTING.md` — Full contribution guide covering setup, code standards, module design principles, commit conventions, and the PR process.
 
 ### Changed
+- `modules/storage` — Strengthened `https_only_policy_applied` test assertion: now decodes the bucket policy JSON and checks `Effect == "Deny"` and `Condition.Bool["aws:SecureTransport"] == "false"` rather than a trivially-true `!= null` check.
+- `modules/monitoring` — Strengthened `sns_topic_always_created` test assertion: now checks `name == "<name>-alarms"` rather than `!= null`; removed `warning_threshold_lower_than_critical` test which only asserted that `70 < 90` (no module logic was exercised).
+- `.github/workflows/module-tests.yml` — Bumped `TF_VERSION` from `1.7.5` to `1.10.5`; upgraded `actions/checkout` to `@v4` and `hashicorp/setup-terraform` to `@v3`; added `test-sg` and `test-vpc-endpoint` jobs with smart change detection; added both to the `tests-passed` gate job.
+- `.github/workflows/terraform-deploy.yml` — Bumped default `tf_version` from `1.7.5` to `1.10.5`; upgraded `actions/checkout` to `@v4` and `hashicorp/setup-terraform` to `@v3` for consistency with module tests.
+- `README.md` — Expanded Testing section: added full module test coverage table for all nine modules; added missing `terraform test` commands for compute, iam, monitoring, security-group-module, and vpc-endpoint-module.
 - `modules/compute` — Enforced IMDSv2 (`http_tokens = required`, hop limit = 1) on all launch templates; pinned ASG to specific launch template version to prevent unplanned rolling refreshes.
 - `modules/compute` — Health check type now automatically switches to `ELB` when `target_group_arns` is non-empty.
 - `modules/storage` — Added HTTPS-only bucket policy (`DenyNonTLSRequests`), `bucket_key_enabled = true` to reduce KMS API costs, and optional server access logging.
