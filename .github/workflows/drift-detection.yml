@@ -1,0 +1,287 @@
+name: Drift Detection
+
+# Run a terraform plan against all environments on a schedule and on demand.
+# If the plan shows any diff, the job fails — indicating that the live
+# infrastructure has drifted from the Terraform configuration.
+#
+# Common causes of drift:
+#   - Manual changes made via the AWS Console or CLI
+#   - AWS auto-scaling adjusting capacity (expected — use ignore_changes)
+#   - Auto-applied AWS-managed updates (e.g. security group rules added by services)
+#
+# When drift is detected, the plan output is uploaded as an artefact and a
+# GitHub issue is opened so the team can investigate and reconcile.
+
+on:
+  schedule:
+    # Run at 06:00 UTC every day (before the business day starts)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to check (leave blank for all)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - dev
+          - staging
+          - prod
+
+concurrency:
+  group: drift-detection
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: "us-west-2"
+  TF_VERSION: "1.7.5"
+
+jobs:
+  drift-dev:
+    name: Drift Check — dev
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' ||
+      github.event.inputs.environment == 'all' ||
+      github.event.inputs.environment == 'dev'
+    permissions:
+      contents: read
+      id-token: write
+      issues: write  # Open a GitHub issue if drift is detected
+    env:
+      ENVIRONMENT: dev
+      TF_VAR_account_id: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          role-to-assume: ${{ secrets.DEV_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-drift-dev
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          terraform -chdir=environments/${{ env.ENVIRONMENT }} init \
+            -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
+
+      - name: Terraform Plan (drift check)
+        id: plan
+        run: |
+          set -o pipefail
+          terraform -chdir=environments/${{ env.ENVIRONMENT }} plan \
+            -detailed-exitcode \
+            -no-color \
+            2>&1 | tee plan_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+        # Exit codes: 0 = no changes, 1 = error, 2 = changes detected (drift)
+        continue-on-error: true
+
+      - name: Upload drift report
+        if: steps.plan.outputs.exit_code == '2'
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-dev-${{ github.run_id }}
+          path: plan_output.txt
+          retention-days: 30
+
+      - name: Open issue on drift detected
+        if: steps.plan.outputs.exit_code == '2'
+        uses: actions/github-script@v6.4.1
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('plan_output.txt', 'utf8');
+            const body = plan.length > 10000
+              ? plan.substring(0, 10000) + '\n\n...[truncated — download the full artefact from the workflow run]'
+              : plan;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Drift] Infrastructure drift detected in dev (${new Date().toISOString().split('T')[0]})`,
+              labels: ['drift', 'infrastructure'],
+              body: `## Drift Detected in \`dev\`\n\nA scheduled drift check found that the live infrastructure differs from the Terraform configuration.\n\n**Workflow run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n### Plan output\n\`\`\`\n${body}\n\`\`\`\n\n### Resolution\n1. Review the plan output above\n2. If the drift is expected (e.g. autoscaling), add \`ignore_changes\` to the relevant resource\n3. If the drift is unexpected, investigate who made the manual change and re-apply Terraform to reconcile`
+            });
+
+      - name: Fail on drift
+        if: steps.plan.outputs.exit_code == '2'
+        run: |
+          echo "Drift detected in dev environment. See uploaded artefact and opened issue."
+          exit 1
+
+      - name: Fail on plan error
+        if: steps.plan.outputs.exit_code == '1'
+        run: |
+          echo "Terraform plan failed with an error."
+          exit 1
+
+  drift-staging:
+    name: Drift Check — staging
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' ||
+      github.event.inputs.environment == 'all' ||
+      github.event.inputs.environment == 'staging'
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    env:
+      ENVIRONMENT: staging
+      TF_VAR_account_id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          role-to-assume: ${{ secrets.STAGING_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-drift-staging
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          terraform -chdir=environments/${{ env.ENVIRONMENT }} init \
+            -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
+
+      - name: Terraform Plan (drift check)
+        id: plan
+        run: |
+          set -o pipefail
+          terraform -chdir=environments/${{ env.ENVIRONMENT }} plan \
+            -detailed-exitcode \
+            -no-color \
+            2>&1 | tee plan_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      - name: Upload drift report
+        if: steps.plan.outputs.exit_code == '2'
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-staging-${{ github.run_id }}
+          path: plan_output.txt
+          retention-days: 30
+
+      - name: Open issue on drift detected
+        if: steps.plan.outputs.exit_code == '2'
+        uses: actions/github-script@v6.4.1
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('plan_output.txt', 'utf8');
+            const body = plan.length > 10000
+              ? plan.substring(0, 10000) + '\n\n...[truncated]'
+              : plan;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Drift] Infrastructure drift detected in staging (${new Date().toISOString().split('T')[0]})`,
+              labels: ['drift', 'infrastructure'],
+              body: `## Drift Detected in \`staging\`\n\n**Workflow run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n### Plan output\n\`\`\`\n${body}\n\`\`\``
+            });
+
+      - name: Fail on drift
+        if: steps.plan.outputs.exit_code == '2'
+        run: exit 1
+
+      - name: Fail on plan error
+        if: steps.plan.outputs.exit_code == '1'
+        run: exit 1
+
+  drift-prod:
+    name: Drift Check — prod
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' ||
+      github.event.inputs.environment == 'all' ||
+      github.event.inputs.environment == 'prod'
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    env:
+      ENVIRONMENT: prod
+      TF_VAR_account_id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          role-to-assume: ${{ secrets.PROD_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-drift-prod
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          terraform -chdir=environments/${{ env.ENVIRONMENT }} init \
+            -backend-config="key=${ENVIRONMENT}/terraform.tfstate"
+
+      - name: Terraform Plan (drift check)
+        id: plan
+        run: |
+          set -o pipefail
+          terraform -chdir=environments/${{ env.ENVIRONMENT }} plan \
+            -detailed-exitcode \
+            -no-color \
+            2>&1 | tee plan_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      - name: Upload drift report
+        if: steps.plan.outputs.exit_code == '2'
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-prod-${{ github.run_id }}
+          path: plan_output.txt
+          retention-days: 90
+
+      - name: Open issue on drift detected
+        if: steps.plan.outputs.exit_code == '2'
+        uses: actions/github-script@v6.4.1
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('plan_output.txt', 'utf8');
+            const body = plan.length > 10000
+              ? plan.substring(0, 10000) + '\n\n...[truncated]'
+              : plan;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Drift] Infrastructure drift detected in PRODUCTION (${new Date().toISOString().split('T')[0]})`,
+              labels: ['drift', 'infrastructure', 'production'],
+              body: `## Drift Detected in \`prod\`\n\n> **This is production.** Review carefully before taking any action.\n\n**Workflow run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n### Plan output\n\`\`\`\n${body}\n\`\`\``
+            });
+
+      - name: Fail on drift
+        if: steps.plan.outputs.exit_code == '2'
+        run: exit 1
+
+      - name: Fail on plan error
+        if: steps.plan.outputs.exit_code == '1'
+        run: exit 1

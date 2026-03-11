@@ -1,0 +1,342 @@
+name: Module Tests
+
+# Run Terraform native tests on every module that has changed.
+# Tests use mock providers — no AWS credentials or live resources required.
+# See tests/README.md for the testing strategy and how to add new tests.
+
+on:
+  pull_request:
+    paths:
+      - 'modules/**'
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    paths:
+      - 'modules/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: "1.10.5"
+
+jobs:
+  # ── Static checks (always run) ──────────────────────────────────────────────
+  fmt-validate:
+    name: Format & Validate All Modules
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive modules/
+
+      - name: Validate each module
+        run: |
+          for module in \
+            modules/kms \
+            modules/storage \
+            modules/alb \
+            modules/compute \
+            modules/iam \
+            modules/monitoring \
+            modules/networking/vpc-module \
+            modules/networking/security-group-module \
+            modules/networking/vpc-endpoint-module; do
+            if [ -d "$module" ]; then
+              echo "==> Validating $module"
+              terraform -chdir="$module" init -backend=false -input=false > /dev/null
+              terraform -chdir="$module" validate
+            fi
+          done
+
+  # Detect which modules have changed so we only test what's relevant.
+  # On workflow_dispatch (manual run) we test everything.
+  detect-changes:
+    name: Detect Changed Modules
+    runs-on: ubuntu-latest
+    outputs:
+      alb:          ${{ steps.changes.outputs.alb }}
+      compute:      ${{ steps.changes.outputs.compute }}
+      iam:          ${{ steps.changes.outputs.iam }}
+      kms:          ${{ steps.changes.outputs.kms }}
+      monitoring:   ${{ steps.changes.outputs.monitoring }}
+      storage:      ${{ steps.changes.outputs.storage }}
+      vpc:          ${{ steps.changes.outputs.vpc }}
+      sg:           ${{ steps.changes.outputs.sg }}
+      vpc-endpoint: ${{ steps.changes.outputs.vpc-endpoint }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed modules
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual run — test everything
+            echo "alb=true"          >> "$GITHUB_OUTPUT"
+            echo "compute=true"      >> "$GITHUB_OUTPUT"
+            echo "iam=true"          >> "$GITHUB_OUTPUT"
+            echo "kms=true"          >> "$GITHUB_OUTPUT"
+            echo "monitoring=true"   >> "$GITHUB_OUTPUT"
+            echo "storage=true"      >> "$GITHUB_OUTPUT"
+            echo "vpc=true"          >> "$GITHUB_OUTPUT"
+            echo "sg=true"           >> "$GITHUB_OUTPUT"
+            echo "vpc-endpoint=true" >> "$GITHUB_OUTPUT"
+          else
+            BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+            HEAD="${{ github.event.pull_request.head.sha || github.sha }}"
+            CHANGED=$(git diff --name-only "$BASE" "$HEAD")
+            echo "$CHANGED"
+
+            grep -q "^modules/alb/"                                    <<< "$CHANGED" && echo "alb=true"          >> "$GITHUB_OUTPUT" || echo "alb=false"          >> "$GITHUB_OUTPUT"
+            grep -q "^modules/compute/"                                <<< "$CHANGED" && echo "compute=true"      >> "$GITHUB_OUTPUT" || echo "compute=false"      >> "$GITHUB_OUTPUT"
+            grep -q "^modules/iam/"                                    <<< "$CHANGED" && echo "iam=true"          >> "$GITHUB_OUTPUT" || echo "iam=false"          >> "$GITHUB_OUTPUT"
+            grep -q "^modules/kms/"                                    <<< "$CHANGED" && echo "kms=true"          >> "$GITHUB_OUTPUT" || echo "kms=false"          >> "$GITHUB_OUTPUT"
+            grep -q "^modules/monitoring/"                             <<< "$CHANGED" && echo "monitoring=true"   >> "$GITHUB_OUTPUT" || echo "monitoring=false"   >> "$GITHUB_OUTPUT"
+            grep -q "^modules/storage/"                                <<< "$CHANGED" && echo "storage=true"      >> "$GITHUB_OUTPUT" || echo "storage=false"      >> "$GITHUB_OUTPUT"
+            grep -q "^modules/networking/vpc-module/"                  <<< "$CHANGED" && echo "vpc=true"          >> "$GITHUB_OUTPUT" || echo "vpc=false"          >> "$GITHUB_OUTPUT"
+            grep -q "^modules/networking/security-group-module/"       <<< "$CHANGED" && echo "sg=true"           >> "$GITHUB_OUTPUT" || echo "sg=false"           >> "$GITHUB_OUTPUT"
+            grep -q "^modules/networking/vpc-endpoint-module/"         <<< "$CHANGED" && echo "vpc-endpoint=true" >> "$GITHUB_OUTPUT" || echo "vpc-endpoint=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  test-kms:
+    name: Test — modules/kms
+    needs: detect-changes
+    if: needs.detect-changes.outputs.kms == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/kms init
+
+      - name: Run tests
+        run: terraform -chdir=modules/kms test -verbose
+
+  test-storage:
+    name: Test — modules/storage
+    needs: detect-changes
+    if: needs.detect-changes.outputs.storage == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/storage init
+
+      - name: Run tests
+        run: terraform -chdir=modules/storage test -verbose
+
+  test-alb:
+    name: Test — modules/alb
+    needs: detect-changes
+    if: needs.detect-changes.outputs.alb == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/alb init
+
+      - name: Run tests
+        run: terraform -chdir=modules/alb test -verbose
+
+  test-vpc:
+    name: Test — modules/networking/vpc-module
+    needs: detect-changes
+    if: needs.detect-changes.outputs.vpc == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/networking/vpc-module init
+
+      - name: Run tests
+        run: terraform -chdir=modules/networking/vpc-module test -verbose
+
+  test-compute:
+    name: Test — modules/compute
+    needs: detect-changes
+    if: needs.detect-changes.outputs.compute == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/compute init
+
+      - name: Run tests
+        run: terraform -chdir=modules/compute test -verbose
+
+  test-iam:
+    name: Test — modules/iam
+    needs: detect-changes
+    if: needs.detect-changes.outputs.iam == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/iam init
+
+      - name: Run tests
+        run: terraform -chdir=modules/iam test -verbose
+
+  test-monitoring:
+    name: Test — modules/monitoring
+    needs: detect-changes
+    if: needs.detect-changes.outputs.monitoring == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/monitoring init
+
+      - name: Run tests
+        run: terraform -chdir=modules/monitoring test -verbose
+
+  test-sg:
+    name: Test — modules/networking/security-group-module
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sg == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/networking/security-group-module init
+
+      - name: Run tests
+        run: terraform -chdir=modules/networking/security-group-module test -verbose
+
+  test-vpc-endpoint:
+    name: Test — modules/networking/vpc-endpoint-module
+    needs: detect-changes
+    if: needs.detect-changes.outputs.vpc-endpoint == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/networking/vpc-endpoint-module init
+
+      - name: Run tests
+        run: terraform -chdir=modules/networking/vpc-endpoint-module test -verbose
+
+  # Summary job: required status check that passes when all relevant tests pass.
+  # Set this as a required PR check in branch protection rules.
+  # It passes even when no modules changed (all test jobs were skipped).
+  tests-passed:
+    name: Module Tests Passed
+    needs: [fmt-validate, test-kms, test-storage, test-alb, test-vpc, test-compute, test-iam, test-monitoring, test-sg, test-vpc-endpoint]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          results=(
+            "${{ needs.test-kms.result }}"
+            "${{ needs.test-storage.result }}"
+            "${{ needs.test-alb.result }}"
+            "${{ needs.test-vpc.result }}"
+            "${{ needs.test-compute.result }}"
+            "${{ needs.test-iam.result }}"
+            "${{ needs.test-monitoring.result }}"
+            "${{ needs.test-sg.result }}"
+            "${{ needs.test-vpc-endpoint.result }}"
+          )
+          for result in "${results[@]}"; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "One or more module tests failed: ${results[*]}"
+              exit 1
+            fi
+          done
+          echo "All module tests passed (or were skipped — no changes detected)."
