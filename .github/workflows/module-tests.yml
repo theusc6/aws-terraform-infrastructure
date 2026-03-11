@@ -40,6 +40,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4.1.0
+        with:
+          fetch-depth: 0
 
       - name: Detect changed modules
         id: changes
@@ -56,16 +58,16 @@ jobs:
           else
             BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
             HEAD="${{ github.event.pull_request.head.sha || github.sha }}"
-            CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+            CHANGED=$(git diff --name-only "$BASE" "$HEAD")
             echo "$CHANGED"
 
-            grep -q "^modules/alb/"                          <<< "$CHANGED" && echo "alb=true"        >> "$GITHUB_OUTPUT" || echo "alb=false"        >> "$GITHUB_OUTPUT"
-            grep -q "^modules/compute/"                      <<< "$CHANGED" && echo "compute=true"    >> "$GITHUB_OUTPUT" || echo "compute=false"    >> "$GITHUB_OUTPUT"
-            grep -q "^modules/iam/"                          <<< "$CHANGED" && echo "iam=true"        >> "$GITHUB_OUTPUT" || echo "iam=false"        >> "$GITHUB_OUTPUT"
-            grep -q "^modules/kms/"                          <<< "$CHANGED" && echo "kms=true"        >> "$GITHUB_OUTPUT" || echo "kms=false"        >> "$GITHUB_OUTPUT"
-            grep -q "^modules/monitoring/"                   <<< "$CHANGED" && echo "monitoring=true" >> "$GITHUB_OUTPUT" || echo "monitoring=false" >> "$GITHUB_OUTPUT"
-            grep -q "^modules/storage/"                      <<< "$CHANGED" && echo "storage=true"    >> "$GITHUB_OUTPUT" || echo "storage=false"    >> "$GITHUB_OUTPUT"
-            grep -q "^modules/networking/vpc-module/"        <<< "$CHANGED" && echo "vpc=true"        >> "$GITHUB_OUTPUT" || echo "vpc=false"        >> "$GITHUB_OUTPUT"
+            grep -q "^modules/alb/"                   <<< "$CHANGED" && echo "alb=true"        >> "$GITHUB_OUTPUT" || echo "alb=false"        >> "$GITHUB_OUTPUT"
+            grep -q "^modules/compute/"               <<< "$CHANGED" && echo "compute=true"    >> "$GITHUB_OUTPUT" || echo "compute=false"    >> "$GITHUB_OUTPUT"
+            grep -q "^modules/iam/"                   <<< "$CHANGED" && echo "iam=true"        >> "$GITHUB_OUTPUT" || echo "iam=false"        >> "$GITHUB_OUTPUT"
+            grep -q "^modules/kms/"                   <<< "$CHANGED" && echo "kms=true"        >> "$GITHUB_OUTPUT" || echo "kms=false"        >> "$GITHUB_OUTPUT"
+            grep -q "^modules/monitoring/"            <<< "$CHANGED" && echo "monitoring=true" >> "$GITHUB_OUTPUT" || echo "monitoring=false" >> "$GITHUB_OUTPUT"
+            grep -q "^modules/storage/"               <<< "$CHANGED" && echo "storage=true"    >> "$GITHUB_OUTPUT" || echo "storage=false"    >> "$GITHUB_OUTPUT"
+            grep -q "^modules/networking/vpc-module/" <<< "$CHANGED" && echo "vpc=true"        >> "$GITHUB_OUTPUT" || echo "vpc=false"        >> "$GITHUB_OUTPUT"
           fi
 
   test-kms:
