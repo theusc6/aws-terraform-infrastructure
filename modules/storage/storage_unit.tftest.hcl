@@ -37,7 +37,7 @@ run "public_access_is_fully_blocked" {
 # ── Test: HTTPS-only policy is always applied ─────────────────────────────────
 
 run "https_only_policy_applied" {
-  command = plan
+  command = apply
 
   variables {
     bucket_name = "test-bucket-12345"
