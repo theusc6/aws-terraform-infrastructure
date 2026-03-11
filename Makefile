@@ -11,7 +11,7 @@ TF_DIR := environments/$(ENV)
 TF  := terraform -chdir=$(TF_DIR)
 
 .PHONY: help bootstrap init validate fmt fmt-check plan apply destroy \
-        lint security-scan test output clean
+        lint security-scan test lock output clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -64,6 +64,17 @@ lint: ## Run TFLint against the selected environment
 security-scan: ## Run Checkov security scan against the selected environment
 	@which checkov > /dev/null || pip install checkov
 	checkov --directory $(TF_DIR) --skip-check CKV_TF_1 --compact --quiet
+
+lock: ## Regenerate .terraform.lock.hcl for all environments (run after adding/changing providers)
+	@echo "Locking providers for all environments (linux_amd64, darwin_amd64, darwin_arm64)..."
+	@for env in dev staging prod; do \
+		echo "==> $$env"; \
+		terraform -chdir=environments/$$env providers lock \
+			-platform=linux_amd64 \
+			-platform=darwin_amd64 \
+			-platform=darwin_arm64; \
+	done
+	@echo "Done. Commit the updated .terraform.lock.hcl files."
 
 test: ## Run Terraform native unit tests for all modules (no AWS credentials required)
 	@echo "Running module tests..."

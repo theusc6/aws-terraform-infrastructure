@@ -24,6 +24,43 @@ env:
   TF_VERSION: "1.7.5"
 
 jobs:
+  # ── Static checks (always run) ──────────────────────────────────────────────
+  fmt-validate:
+    name: Format & Validate All Modules
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive modules/
+
+      - name: Validate each module
+        run: |
+          for module in \
+            modules/kms \
+            modules/storage \
+            modules/alb \
+            modules/compute \
+            modules/iam \
+            modules/monitoring \
+            modules/networking/vpc-module \
+            modules/networking/security-group-module \
+            modules/networking/vpc-endpoint-module; do
+            if [ -d "$module" ]; then
+              echo "==> Validating $module"
+              terraform -chdir="$module" init -backend=false -input=false > /dev/null
+              terraform -chdir="$module" validate
+            fi
+          done
+
   # Detect which modules have changed so we only test what's relevant.
   # On workflow_dispatch (manual run) we test everything.
   detect-changes:
@@ -158,12 +195,78 @@ jobs:
       - name: Run tests
         run: terraform -chdir=modules/networking/vpc-module test -verbose
 
+  test-compute:
+    name: Test — modules/compute
+    needs: detect-changes
+    if: needs.detect-changes.outputs.compute == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/compute init
+
+      - name: Run tests
+        run: terraform -chdir=modules/compute test -verbose
+
+  test-iam:
+    name: Test — modules/iam
+    needs: detect-changes
+    if: needs.detect-changes.outputs.iam == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/iam init
+
+      - name: Run tests
+        run: terraform -chdir=modules/iam test -verbose
+
+  test-monitoring:
+    name: Test — modules/monitoring
+    needs: detect-changes
+    if: needs.detect-changes.outputs.monitoring == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.0
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/monitoring init
+
+      - name: Run tests
+        run: terraform -chdir=modules/monitoring test -verbose
+
   # Summary job: required status check that passes when all relevant tests pass.
   # Set this as a required PR check in branch protection rules.
   # It passes even when no modules changed (all test jobs were skipped).
   tests-passed:
     name: Module Tests Passed
-    needs: [test-kms, test-storage, test-alb, test-vpc]
+    needs: [fmt-validate, test-kms, test-storage, test-alb, test-vpc, test-compute, test-iam, test-monitoring]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -174,6 +277,9 @@ jobs:
             "${{ needs.test-storage.result }}"
             "${{ needs.test-alb.result }}"
             "${{ needs.test-vpc.result }}"
+            "${{ needs.test-compute.result }}"
+            "${{ needs.test-iam.result }}"
+            "${{ needs.test-monitoring.result }}"
           )
           for result in "${results[@]}"; do
             if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then

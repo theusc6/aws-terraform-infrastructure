@@ -54,6 +54,7 @@ jobs:
       issues: write  # Open a GitHub issue if drift is detected
     env:
       ENVIRONMENT: dev
+      TF_VAR_account_id: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4.1.0
@@ -138,6 +139,7 @@ jobs:
       issues: write
     env:
       ENVIRONMENT: staging
+      TF_VAR_account_id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4.1.0
@@ -217,6 +219,7 @@ jobs:
       issues: write
     env:
       ENVIRONMENT: prod
+      TF_VAR_account_id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4.1.0
