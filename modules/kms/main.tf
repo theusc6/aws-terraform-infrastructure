@@ -8,7 +8,7 @@ data "aws_caller_identity" "current" {}
 resource "aws_kms_key" "this" {
   description             = var.description
   deletion_window_in_days = var.deletion_window_in_days
-  enable_key_rotation     = true  # Rotate the backing key material every 365 days
+  enable_key_rotation     = true # Rotate the backing key material every 365 days
   multi_region            = var.multi_region
 
   # The key policy follows least-privilege: the root account retains full emergency

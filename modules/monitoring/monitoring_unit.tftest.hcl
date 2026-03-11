@@ -78,10 +78,10 @@ run "alb_alarms_skipped_without_alb" {
   command = plan
 
   variables {
-    name                   = "test-app"
-    environment            = "test"
-    autoscaling_group_name = "test-app-asg"
-    alb_arn_suffix         = null
+    name                    = "test-app"
+    environment             = "test"
+    autoscaling_group_name  = "test-app-asg"
+    alb_arn_suffix          = null
     target_group_arn_suffix = null
   }
 

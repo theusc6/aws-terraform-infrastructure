@@ -19,11 +19,11 @@ resource "aws_security_group" "this" {
   dynamic "ingress" {
     for_each = var.ingress_sg_rules
     content {
-      from_port                = ingress.value.from_port
-      to_port                  = ingress.value.to_port
-      protocol                 = ingress.value.protocol
-      security_groups          = [ingress.value.source_security_group_id]
-      description              = ingress.value.description
+      from_port       = ingress.value.from_port
+      to_port         = ingress.value.to_port
+      protocol        = ingress.value.protocol
+      security_groups = [ingress.value.source_security_group_id]
+      description     = ingress.value.description
     }
   }
 

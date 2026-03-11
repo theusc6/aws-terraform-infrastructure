@@ -34,9 +34,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm     = "aws:kms"
-      kms_master_key_id = var.kms_key_arn  # null → AWS-managed key; set to CMK ARN in prod
+      kms_master_key_id = var.kms_key_arn # null → AWS-managed key; set to CMK ARN in prod
     }
-    bucket_key_enabled = true  # Reduces KMS API call cost by ~99% for high-throughput buckets
+    bucket_key_enabled = true # Reduces KMS API call cost by ~99% for high-throughput buckets
   }
 }
 
