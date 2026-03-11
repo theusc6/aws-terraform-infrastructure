@@ -3,17 +3,6 @@
 
 mock_provider "aws" {}
 
-locals {
-  ec2_trust_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "ec2.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
-}
-
 # ── Test: role is created with the correct name ───────────────────────────────
 
 run "role_name_is_set" {
@@ -21,7 +10,7 @@ run "role_name_is_set" {
 
   variables {
     role_name    = "test-ec2-role"
-    trust_policy = local.ec2_trust_policy
+    trust_policy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
   }
 
   assert {
@@ -37,7 +26,7 @@ run "managed_by_tag_always_present" {
 
   variables {
     role_name    = "test-ec2-role"
-    trust_policy = local.ec2_trust_policy
+    trust_policy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
   }
 
   assert {
@@ -53,7 +42,7 @@ run "instance_profile_created_when_requested" {
 
   variables {
     role_name               = "test-ec2-role"
-    trust_policy            = local.ec2_trust_policy
+    trust_policy            = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
     create_instance_profile = true
   }
 
@@ -70,7 +59,7 @@ run "instance_profile_not_created_by_default" {
 
   variables {
     role_name    = "test-ec2-role"
-    trust_policy = local.ec2_trust_policy
+    trust_policy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
   }
 
   assert {
@@ -86,7 +75,7 @@ run "no_attachments_when_policy_arns_empty" {
 
   variables {
     role_name    = "test-ec2-role"
-    trust_policy = local.ec2_trust_policy
+    trust_policy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
     policy_arns  = []
   }
 
@@ -103,7 +92,7 @@ run "policy_attachments_created_for_each_arn" {
 
   variables {
     role_name    = "test-ec2-role"
-    trust_policy = local.ec2_trust_policy
+    trust_policy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
     policy_arns = [
       "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
       "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy",

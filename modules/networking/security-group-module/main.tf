@@ -38,7 +38,7 @@ resource "aws_security_group" "this" {
     }
   }
 
-  tags = merge({ Name = var.name }, var.tags)
+  tags = merge({ Name = var.name, ManagedBy = "Terraform" }, var.tags)
 
   lifecycle {
     create_before_destroy = true

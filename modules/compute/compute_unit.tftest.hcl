@@ -48,7 +48,7 @@ run "ebs_encryption_enabled" {
   }
 
   assert {
-    condition     = aws_launch_template.this.block_device_mappings[0].ebs[0].encrypted == true
+    condition     = tobool(aws_launch_template.this.block_device_mappings[0].ebs[0].encrypted) == true
     error_message = "Root EBS volume must always be encrypted."
   }
 }
@@ -86,7 +86,7 @@ run "no_public_ip_assigned" {
   }
 
   assert {
-    condition     = aws_launch_template.this.network_interfaces[0].associate_public_ip_address == false
+    condition     = tobool(aws_launch_template.this.network_interfaces[0].associate_public_ip_address) == false
     error_message = "Instances must not receive public IP addresses — they should be in private subnets behind an ALB."
   }
 }

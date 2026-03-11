@@ -31,7 +31,7 @@ on:
         description: 'Terraform version to use'
         required: false
         type: string
-        default: '1.7.5'
+        default: '1.10.5'
       checkov_version:
         description: 'Checkov version to use'
         required: false
@@ -73,7 +73,7 @@ jobs:
       plan_exit_code: ${{ steps.plan.outputs.exit_code }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4.0.1
@@ -83,7 +83,7 @@ jobs:
           role-session-name: github-actions-${{ inputs.environment }}-plan
 
       - name: Setup Terraform ${{ inputs.tf_version }}
-        uses: hashicorp/setup-terraform@v2.0.3
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ inputs.tf_version }}
           terraform_wrapper: false   # Must be false for Infracost JSON parsing
@@ -157,7 +157,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v4.7.1
@@ -188,7 +188,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4.0.1
@@ -233,7 +233,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4
 
       - name: Check for Infracost API key
         id: check-key
@@ -257,7 +257,7 @@ jobs:
 
       - name: Setup Terraform ${{ inputs.tf_version }}
         if: steps.check-key.outputs.present == 'true'
-        uses: hashicorp/setup-terraform@v2.0.3
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ inputs.tf_version }}
           terraform_wrapper: false   # Required — Infracost needs raw terraform output
@@ -333,7 +333,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4.0.1
@@ -343,7 +343,7 @@ jobs:
           role-session-name: github-actions-${{ inputs.environment }}-apply
 
       - name: Setup Terraform ${{ inputs.tf_version }}
-        uses: hashicorp/setup-terraform@v2.0.3
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ inputs.tf_version }}
           terraform_wrapper: false

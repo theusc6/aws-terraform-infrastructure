@@ -384,16 +384,35 @@ make test
 terraform -chdir=modules/kms test -verbose
 terraform -chdir=modules/alb test -verbose
 terraform -chdir=modules/storage test -verbose
+terraform -chdir=modules/compute test -verbose
+terraform -chdir=modules/iam test -verbose
+terraform -chdir=modules/monitoring test -verbose
 terraform -chdir=modules/networking/vpc-module test -verbose
+terraform -chdir=modules/networking/security-group-module test -verbose
+terraform -chdir=modules/networking/vpc-endpoint-module test -verbose
 ```
 
 ### CI
 
 The `module-tests.yml` workflow runs automatically on every PR and push to `main` that touches `modules/**`. It detects which modules changed and only tests those — keeping CI fast. A summary job (`Module Tests Passed`) is available as a required branch protection status check.
 
+All nine modules have test coverage:
+
+| Module | Test file | Key invariants tested |
+|--------|-----------|----------------------|
+| `modules/kms` | `kms_unit.tftest.hcl` | Key rotation, deletion window validation, alias prefix |
+| `modules/storage` | `storage_unit.tftest.hcl` | Public access block, HTTPS-only policy content, versioning, lifecycle |
+| `modules/alb` | `alb_unit.tftest.hcl` | HTTPS listener gating, SSL policy, deletion protection |
+| `modules/compute` | `compute_unit.tftest.hcl` | IMDSv2 required, EBS encryption, no public IP, health check type |
+| `modules/iam` | `iam_unit.tftest.hcl` | Role name, ManagedBy tag, instance profile, policy attachment count |
+| `modules/monitoring` | `monitoring_unit.tftest.hcl` | SNS topic name, CPU thresholds, conditional ALB alarms |
+| `modules/networking/vpc-module` | `vpc_unit.tftest.hcl` | DNS defaults, subnet count, NAT gateway modes, flow logs |
+| `modules/networking/security-group-module` | `sg_unit.tftest.hcl` | No default ingress, default egress protocol, rule counts |
+| `modules/networking/vpc-endpoint-module` | `vpc_endpoint_unit.tftest.hcl` | Interface vs Gateway wiring, invalid type rejection |
+
 Each test suite validates:
-- **Variable constraints** — invalid values are correctly rejected
-- **Security defaults** — encryption, public access blocking, IMDSv2 are on by default
+- **Variable constraints** — invalid values are correctly rejected via `expect_failures`
+- **Security defaults** — encryption, public access blocking, IMDSv2 are always on
 - **Conditional resources** — e.g. HTTPS listener only created when `certificate_arn` is set
 - **Output wiring** — outputs reference the correct resource attributes
 

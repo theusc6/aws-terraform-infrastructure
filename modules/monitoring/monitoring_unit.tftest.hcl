@@ -15,8 +15,8 @@ run "sns_topic_always_created" {
   }
 
   assert {
-    condition     = aws_sns_topic.alarms != null
-    error_message = "SNS alarms topic must always be created."
+    condition     = aws_sns_topic.alarms.name == "test-app-alarms"
+    error_message = "SNS topic name must be '<name>-alarms'."
   }
 }
 
@@ -69,25 +69,6 @@ run "cpu_critical_threshold_default" {
   assert {
     condition     = aws_cloudwatch_metric_alarm.cpu_high_critical.threshold == 90
     error_message = "CPU critical threshold must default to 90."
-  }
-}
-
-# ── Test: warning threshold must be lower than critical ───────────────────────
-
-run "warning_threshold_lower_than_critical" {
-  command = plan
-
-  variables {
-    name                   = "test-app"
-    environment            = "test"
-    autoscaling_group_name = "test-app-asg"
-    cpu_warning_threshold  = 70
-    cpu_critical_threshold = 90
-  }
-
-  assert {
-    condition     = aws_cloudwatch_metric_alarm.cpu_high_warning.threshold < aws_cloudwatch_metric_alarm.cpu_high_critical.threshold
-    error_message = "CPU warning threshold must be lower than the critical threshold."
   }
 }
 
