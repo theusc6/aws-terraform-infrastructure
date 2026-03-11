@@ -92,7 +92,7 @@ run "encryption_uses_bucket_key" {
   }
 
   assert {
-    condition     = aws_s3_bucket_server_side_encryption_configuration.this.rule[0].bucket_key_enabled == true
+    condition     = one(aws_s3_bucket_server_side_encryption_configuration.this.rule).bucket_key_enabled == true
     error_message = "bucket_key_enabled must be true to reduce KMS API costs."
   }
 }
@@ -107,7 +107,7 @@ run "encryption_uses_provided_kms_key" {
   }
 
   assert {
-    condition     = aws_s3_bucket_server_side_encryption_configuration.this.rule[0].apply_server_side_encryption_by_default[0].kms_master_key_id == "arn:aws:kms:us-west-2:123456789012:key/fake-key-id"
+    condition     = one(aws_s3_bucket_server_side_encryption_configuration.this.rule).apply_server_side_encryption_by_default[0].kms_master_key_id == "arn:aws:kms:us-west-2:123456789012:key/fake-key-id"
     error_message = "Encryption must use the provided KMS key ARN."
   }
 }
