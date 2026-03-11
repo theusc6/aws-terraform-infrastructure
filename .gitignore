@@ -9,7 +9,11 @@ terraform.tfvars
 
 # Terraform working directories (generated on terraform init)
 **/.terraform/
-**/.terraform.lock.hcl
+
+# Lock files ARE committed — they pin provider versions for reproducible builds.
+# Run: terraform -chdir=environments/<env> providers lock \
+#        -platform=linux_amd64 -platform=darwin_amd64 -platform=darwin_arm64
+# !**/.terraform.lock.hcl  (no longer ignored)
 
 # Plan output files (contain sensitive data)
 *.tfplan
