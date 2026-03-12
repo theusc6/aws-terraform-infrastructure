@@ -1,12 +1,6 @@
 name: Dev
 
 on:
-  pull_request:
-    paths:
-      - 'environments/dev/**.tf'
-      - 'modules/**/*.tf'
-    branches:
-      - main
   push:
     tags:
       - 'dev-*'

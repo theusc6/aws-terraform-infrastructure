@@ -9,21 +9,21 @@
 # Replace the placeholder handles below with your actual GitHub usernames/teams.
 
 # Default owner for everything not matched below
-*                                   @your-org/platform-team
+*                                   @theusc6
 
 # Production environment — requires senior engineer sign-off
-environments/prod/**                @your-org/platform-leads
+environments/prod/**                @theusc6
 
 # All CI/CD pipeline changes — any pipeline engineer can approve
-.github/workflows/**                @your-org/platform-team
+.github/workflows/**                @theusc6
 
 # IAM changes require security team review
-modules/iam/**                      @your-org/security-team
-modules/kms/**                      @your-org/security-team
+modules/iam/**                      @theusc6
+modules/kms/**                      @theusc6
 
 # Network changes require network engineer review
-modules/networking/**               @your-org/platform-team
+modules/networking/**               @theusc6
 
 # Documentation changes — any team member
-*.md                                @your-org/platform-team
-CONTRIBUTING.md                     @your-org/platform-team
+*.md                                @theusc6
+CONTRIBUTING.md                     @theusc6
