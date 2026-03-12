@@ -32,12 +32,7 @@ gh api \
     ]
   },
   "enforce_admins": true,
-  "required_pull_request_reviews": {
-    "dismiss_stale_reviews": true,
-    "require_code_owner_reviews": true,
-    "required_approving_review_count": 1,
-    "require_last_push_approval": true
-  },
+  "required_pull_request_reviews": null,
   "restrictions": null,
   "required_linear_history": true,
   "allow_force_pushes": false,
@@ -59,10 +54,7 @@ echo "  - TFLint (dev)"
 echo "  - Gitleaks Secret Scan"
 echo ""
 echo "Rules applied:"
-echo "  - 1 required approving review"
-echo "  - Code owner review required (CODEOWNERS)"
-echo "  - Dismiss stale reviews on new commits"
-echo "  - Require last push approval (prevents self-approval)"
+echo "  - No PR review requirement (solo repo — status checks are the gate)"
 echo "  - Linear history (no merge commits)"
 echo "  - No force pushes"
 echo "  - Admins are NOT exempt (enforce_admins: true)"
