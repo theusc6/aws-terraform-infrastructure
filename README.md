@@ -30,6 +30,16 @@ A production-grade, opinionated Terraform monorepo for deploying a three-tier we
 ## Architecture Overview
 
 ```
+                      Route 53 (DNS)
+                      Hosted Zone
+                           │
+                           │  CNAME validation records
+                           ▼
+                      ACM Certificate
+                      (DNS-validated)
+                           │
+                           │  TLS cert attached to ALB listener
+                           ▼
                           ┌─────────────────────────────────────────────────┐
                           │                    AWS Account                   │
                           │                                                  │
@@ -39,7 +49,7 @@ A production-grade, opinionated Terraform monorepo for deploying a three-tier we
                           │   │  │         Public Subnets (AZa/b/c)    │ │  │
                           │   │  │  ┌──────────┐   ┌───────────────┐  │ │  │
 Internet ─────────────────┼───┼──┤  │   ALB    │   │  NAT Gateway  │  │ │  │
-                          │   │  │  └────┬─────┘   └───────────────┘  │ │  │
+   (HTTPS :443)           │   │  │  └────┬─────┘   └───────────────┘  │ │  │
                           │   │  └───────┼─────────────────────────────┘ │  │
                           │   │          │                                  │  │
                           │   │  ┌───────┼─────────────────────────────┐ │  │
@@ -64,12 +74,14 @@ Internet ─────────────────┼───┼─�
 ```
 
 **Data flow:**
-1. HTTPS traffic enters via the internet-facing ALB in the public subnets.
-2. The ALB terminates TLS and forwards to EC2 instances running in private subnets.
-3. EC2 instances reach the internet (for package updates, etc.) via NAT Gateways.
-4. Application data is persisted to KMS-encrypted S3 buckets.
-5. CloudWatch alarms publish to SNS for operational alerting.
-6. VPC Flow Logs capture all traffic metadata for security auditing.
+1. Route 53 resolves the custom domain and routes traffic to the ALB.
+2. ACM provides the TLS certificate attached to the ALB HTTPS listener. DNS validation records in Route 53 keep the certificate auto-renewed.
+3. HTTPS traffic enters via the internet-facing ALB in the public subnets.
+4. The ALB terminates TLS and forwards to EC2 instances running in private subnets.
+5. EC2 instances reach the internet (for package updates, etc.) via NAT Gateways.
+6. Application data is persisted to KMS-encrypted S3 buckets.
+7. CloudWatch alarms publish to SNS for operational alerting.
+8. VPC Flow Logs capture all traffic metadata for security auditing.
 
 ---
 
@@ -78,11 +90,16 @@ Internet ─────────────────┼───┼─�
 ```
 aws-terraform-infrastructure/
 ├── .github/
+│   ├── CODEOWNERS                     # Auto-assign reviewers by file path
 │   └── workflows/
+│       ├── pr-checks.yml          # PR validation — fmt, validate, Checkov, TFLint (no AWS needed)
+│       ├── module-tests.yml       # Terraform native tests for all modules (mock providers)
+│       ├── secret-scan.yml        # Gitleaks secret scanning on every push
 │       ├── changelog.yml          # Auto-generate CHANGELOG on main merges
-│       ├── dev.yml                # Plan + apply pipeline for dev environment
-│       ├── staging.yml            # Plan + apply pipeline for staging environment
-│       └── prod.yml               # Plan + apply pipeline for prod (gated)
+│       ├── drift-detection.yml    # Scheduled drift detection against live environments
+│       ├── dev.yml                # Apply pipeline for dev (fires on dev-* tags)
+│       ├── staging.yml            # Apply pipeline for staging (fires on staging-* tags)
+│       └── prod.yml               # Apply pipeline for prod (gated, fires on prod-* tags)
 │
 ├── environments/
 │   ├── dev/                       # Development environment (low cost, no HA)
@@ -98,8 +115,10 @@ aws-terraform-infrastructure/
 │       └── ...
 │
 ├── modules/
+│   ├── acm/                       # ACM certificate + DNS validation records + validation waiter
 │   ├── alb/                       # Application Load Balancer + target group + listeners
 │   ├── compute/                   # Launch template + Auto Scaling Group
+│   ├── dns/                       # Route 53 hosted zone + A/CNAME/alias records
 │   ├── iam/                       # IAM roles, policy attachments, instance profiles
 │   ├── kms/                       # Customer-managed KMS key + alias
 │   ├── monitoring/                # CloudWatch alarms + SNS topic
@@ -126,6 +145,8 @@ aws-terraform-infrastructure/
 
 | Module | Purpose | Key Resources |
 |--------|---------|---------------|
+| [`modules/dns`](modules/dns/) | Route 53 hosted zone + DNS records | `aws_route53_zone`, `aws_route53_record` |
+| [`modules/acm`](modules/acm/) | TLS certificate + DNS validation | `aws_acm_certificate`, `aws_acm_certificate_validation`, `aws_route53_record` |
 | [`modules/kms`](modules/kms/README.md) | Customer-managed encryption keys | `aws_kms_key`, `aws_kms_alias` |
 | [`modules/networking/vpc-module`](modules/networking/vpc-module/README.md) | VPC, subnets, routing, flow logs | VPC, subnets, IGW, NAT GW, route tables |
 | [`modules/networking/security-group-module`](modules/networking/security-group-module/README.md) | Dynamic security groups | `aws_security_group` |
@@ -225,35 +246,25 @@ make apply ENV=dev
 
 ## CI/CD Pipeline
 
-All three workflows follow the same structure:
-
 ```
-Pull Request opened/updated
+Pull Request opened/updated  (pr-checks.yml + module-tests.yml)
+        │
+        ├── terraform fmt --check     ← fails if files are unformatted
+        ├── terraform init -backend=false
+        ├── terraform validate        ← syntax and schema check (no AWS needed)
+        ├── checkov scan              ← static security policy analysis
+        ├── tflint                    ← AWS-specific static analysis
+        └── terraform test            ← native unit tests with mock providers
         │
         ▼
-  terraform fmt --check     ← fails if files are unformatted
+  [All checks pass → PR can be merged]
         │
         ▼
-  terraform init
+  [Merge to main — no automatic deployment]
         │
-        ▼
-  terraform validate        ← syntax and schema check
-        │
-        ▼
-  terraform plan            ← plan output posted as PR artefact
-        │
-        ▼
-  checkov scan              ← fails on HIGH/CRITICAL severity findings
-        │
-        ▼
-  tflint                    ← AWS-specific static analysis
-        │
-        ▼
-  [PR merged / environment tag pushed]
-        │
-        ├── dev-* tag or PR to main → terraform apply (dev, auto-approved)
-        ├── staging-* tag           → terraform apply (staging, auto-approved)
-        └── prod-* tag              → manual approval → terraform apply (prod)
+        ├── git tag dev-v1.2.0      → terraform plan + apply (dev)
+        ├── git tag staging-v1.2.0  → terraform plan + apply (staging)
+        └── git tag prod-v1.2.0     → manual approval gate → terraform apply (prod)
 ```
 
 ### Deployment tags
@@ -280,8 +291,11 @@ The workflows authenticate to AWS using OIDC (no long-lived keys required).
 | Secret | Required | Description |
 |--------|----------|-------------|
 | `DEV_DEPLOY_ROLE` | Yes | IAM role ARN assumed for dev deployments |
+| `DEV_AWS_ACCOUNT_ID` | Yes | 12-digit AWS account ID for dev (sets `TF_VAR_account_id`) |
 | `STAGING_DEPLOY_ROLE` | Yes | IAM role ARN assumed for staging deployments |
+| `STAGING_AWS_ACCOUNT_ID` | Yes | 12-digit AWS account ID for staging |
 | `PROD_DEPLOY_ROLE` | Yes | IAM role ARN assumed for prod deployments |
+| `PROD_AWS_ACCOUNT_ID` | Yes | 12-digit AWS account ID for prod |
 | `INFRACOST_API_KEY` | No | Infracost API key for PR cost estimates (free tier available) |
 
 Each deploy role should be scoped to the minimum permissions needed for its environment. Using separate roles means a compromised dev pipeline cannot affect production.
@@ -355,10 +369,11 @@ main  ────────────────────────�
 ```
 
 1. **Branch** off `main` for every change.
-2. **Open a PR** — CI runs format, plan, lint, and security scan automatically.
-3. **Merge to main** — triggers an automatic dev deployment.
-4. **Tag** `staging-vX.Y.Z` to promote to staging.
-5. **Tag** `prod-vX.Y.Z` to kick off the production workflow (requires manual approval from a reviewer in the `prod-approval` GitHub environment).
+2. **Open a PR** — CI runs format check, validate, Checkov, TFLint, and module tests automatically. No AWS credentials required.
+3. **Merge to main** — no automatic deployment. Merging is purely a code integration step.
+4. **Tag** `dev-vX.Y.Z` to deploy to dev.
+5. **Tag** `staging-vX.Y.Z` to promote to staging.
+6. **Tag** `prod-vX.Y.Z` to kick off the production workflow (requires manual approval from a reviewer in the `prod-approval` GitHub environment).
 
 > Protect the `main` branch with required PR reviews and required status checks.
 
@@ -381,6 +396,8 @@ This repository uses the [Terraform native test framework](https://developer.has
 make test
 
 # Run tests for a specific module
+terraform -chdir=modules/dns test -verbose
+terraform -chdir=modules/acm test -verbose
 terraform -chdir=modules/kms test -verbose
 terraform -chdir=modules/alb test -verbose
 terraform -chdir=modules/storage test -verbose
@@ -396,10 +413,12 @@ terraform -chdir=modules/networking/vpc-endpoint-module test -verbose
 
 The `module-tests.yml` workflow runs automatically on every PR and push to `main` that touches `modules/**`. It detects which modules changed and only tests those — keeping CI fast. A summary job (`Module Tests Passed`) is available as a required branch protection status check.
 
-All nine modules have test coverage:
+All eleven modules have test coverage:
 
 | Module | Test file | Key invariants tested |
 |--------|-----------|----------------------|
+| `modules/dns` | `dns_unit.tftest.hcl` | Hosted zone creation, record wiring, output correctness |
+| `modules/acm` | `acm_unit.tftest.hcl` | DNS validation method, SANs, validation record wiring, tags, outputs |
 | `modules/kms` | `kms_unit.tftest.hcl` | Key rotation, deletion window validation, alias prefix |
 | `modules/storage` | `storage_unit.tftest.hcl` | Public access block, HTTPS-only policy content, versioning, lifecycle |
 | `modules/alb` | `alb_unit.tftest.hcl` | HTTPS listener gating, SSL policy, deletion protection |
