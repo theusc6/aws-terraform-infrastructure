@@ -17,6 +17,18 @@ mock_provider "aws" {
           resource_record_name  = "_abc123.app.example.com."
           resource_record_type  = "CNAME"
           resource_record_value = "_xyz456.acm-validations.aws."
+        },
+        {
+          domain_name           = "example.com"
+          resource_record_name  = "_abc123.example.com."
+          resource_record_type  = "CNAME"
+          resource_record_value = "_xyz456.acm-validations.aws."
+        },
+        {
+          domain_name           = "www.example.com"
+          resource_record_name  = "_abc123.www.example.com."
+          resource_record_type  = "CNAME"
+          resource_record_value = "_xyz456.acm-validations.aws."
         }
       ]
     }
