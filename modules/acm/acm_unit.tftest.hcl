@@ -4,7 +4,24 @@
 # These tests use mock providers so no AWS credentials or live resources are needed.
 # They validate certificate configuration, DNS validation record creation, and output wiring.
 
-mock_provider "aws" {}
+mock_provider "aws" {
+  # aws_acm_certificate.domain_validation_options is computed after apply.
+  # The mock provider returns it as unknown, which causes the for_each on
+  # aws_route53_record.validation to fail during plan. We override it here
+  # with a static value so the for_each keys are known at plan time.
+  mock_resource "aws_acm_certificate" {
+    defaults = {
+      domain_validation_options = toset([
+        {
+          domain_name           = "app.example.com"
+          resource_record_name  = "_abc123.app.example.com."
+          resource_record_type  = "CNAME"
+          resource_record_value = "_xyz456.acm-validations.aws."
+        }
+      ])
+    }
+  }
+}
 
 # ── Test: default configuration ───────────────────────────────────────────────
 
