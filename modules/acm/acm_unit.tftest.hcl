@@ -26,7 +26,7 @@ mock_provider "aws" {
 # ── Test: default configuration ───────────────────────────────────────────────
 
 run "creates_certificate_with_dns_validation" {
-  command = plan
+  command = apply
 
   variables {
     domain_name    = "app.example.com"
@@ -48,7 +48,7 @@ run "creates_certificate_with_dns_validation" {
 # ── Test: subject alternative names ──────────────────────────────────────────
 
 run "includes_subject_alternative_names" {
-  command = plan
+  command = apply
 
   variables {
     domain_name               = "app.example.com"
@@ -66,7 +66,7 @@ run "includes_subject_alternative_names" {
 # ── Test: create_before_destroy lifecycle ─────────────────────────────────────
 
 run "has_create_before_destroy_lifecycle" {
-  command = plan
+  command = apply
 
   variables {
     domain_name    = "app.example.com"
@@ -83,7 +83,7 @@ run "has_create_before_destroy_lifecycle" {
 # ── Test: tagging ─────────────────────────────────────────────────────────────
 
 run "applies_required_tags" {
-  command = plan
+  command = apply
 
   variables {
     domain_name    = "app.example.com"
@@ -113,7 +113,7 @@ run "applies_required_tags" {
 # ── Test: output wiring ───────────────────────────────────────────────────────
 
 run "outputs_domain_name" {
-  command = plan
+  command = apply
 
   variables {
     domain_name    = "app.example.com"
