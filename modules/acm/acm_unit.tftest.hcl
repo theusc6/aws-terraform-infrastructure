@@ -11,14 +11,14 @@ mock_provider "aws" {
   # with a static value so the for_each keys are known at plan time.
   mock_resource "aws_acm_certificate" {
     defaults = {
-      domain_validation_options = toset([
+      domain_validation_options = [
         {
           domain_name           = "app.example.com"
           resource_record_name  = "_abc123.app.example.com."
           resource_record_type  = "CNAME"
           resource_record_value = "_xyz456.acm-validations.aws."
         }
-      ])
+      ]
     }
   }
 }
