@@ -1,3 +1,20 @@
+# ── DNS Outputs ───────────────────────────────────────────────────────────────
+
+output "name_servers" {
+  description = "Route 53 name servers for the hosted zone. Update your domain registrar's NS records to these values to activate DNS resolution."
+  value       = module.dns.name_servers
+}
+
+output "app_fqdn" {
+  description = "Fully qualified domain name of the application (e.g. app.example.com). This is the public URL that resolves to the load balancer."
+  value       = aws_route53_record.alb_alias.fqdn
+}
+
+output "certificate_arn" {
+  description = "ARN of the ACM certificate attached to the ALB HTTPS listener."
+  value       = module.acm.certificate_arn
+}
+
 # ── Network Outputs ───────────────────────────────────────────────────────────
 
 output "vpc_id" {
