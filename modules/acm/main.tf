@@ -29,22 +29,31 @@ resource "aws_acm_certificate" "this" {
 # ── DNS Validation Records ────────────────────────────────────────────────────
 # ACM provides the exact CNAME name and value it needs to see in DNS.
 # We write those records into Route 53 on ACM's behalf.
-# for_each on domain_validation_options handles the apex domain plus any SANs
-# automatically — one validation record per unique domain name.
+#
+# for_each keys are derived from input variables (known at plan time).
+# Terraform requires that for_each keys be statically determinable during
+# plan — using domain_validation_options as keys fails because that attribute
+# is only populated after ACM processes the certificate request. The record
+# name/value/type (the map values) may be unknown at plan time, which is fine.
+
+locals {
+  # All domains this certificate covers. ACM always returns one
+  # domain_validation_options entry per domain, so this set is a safe key source.
+  validation_domains = toset(concat([var.domain_name], var.subject_alternative_names))
+
+  # Index validation options by domain name for clean lookup in the resource below.
+  validation_options_by_domain = {
+    for dvo in aws_acm_certificate.this.domain_validation_options : dvo.domain_name => dvo
+  }
+}
 
 resource "aws_route53_record" "validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.this.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      record = dvo.resource_record_value
-    }
-  }
+  for_each = local.validation_domains
 
   zone_id = var.hosted_zone_id
-  name    = each.value.name
-  type    = each.value.type
-  records = [each.value.record]
+  name    = local.validation_options_by_domain[each.value].resource_record_name
+  type    = local.validation_options_by_domain[each.value].resource_record_type
+  records = [local.validation_options_by_domain[each.value].resource_record_value]
 
   # 60-second TTL keeps propagation fast while ACM waits for validation.
   # This record is permanent for the life of the certificate — a low TTL
@@ -61,5 +70,5 @@ resource "aws_route53_record" "validation" {
 
 resource "aws_acm_certificate_validation" "this" {
   certificate_arn         = aws_acm_certificate.this.arn
-  validation_record_fqdns = [for record in aws_route53_record.validation : record.fqdn]
+  validation_record_fqdns = [for domain in local.validation_domains : aws_route53_record.validation[domain].fqdn]
 }
