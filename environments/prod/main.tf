@@ -119,11 +119,38 @@ module "vpc_endpoint_s3" {
   tags            = local.tags
 }
 
+# ── DNS ───────────────────────────────────────────────────────────────────────
+# Create the public Route 53 hosted zone for the domain. After apply, update
+# your domain registrar's NS records to the name servers in the dns.name_servers
+# output to delegate resolution to this zone.
+
+module "dns" {
+  source = "../../modules/dns"
+
+  domain_name = var.domain_name
+  environment = local.environment
+  tags        = local.tags
+}
+
+# ── TLS Certificate ───────────────────────────────────────────────────────────
+# Request and validate an ACM certificate for app.<domain>. DNS validation
+# records are written to the Route 53 zone automatically — no manual steps
+# required. The module blocks until ACM transitions the cert to ISSUED.
+
+module "acm" {
+  source = "../../modules/acm"
+
+  domain_name               = "app.${var.domain_name}"
+  subject_alternative_names = [var.domain_name]
+  hosted_zone_id            = module.dns.zone_id
+  environment               = local.environment
+  tags                      = local.tags
+}
+
 # ── Load Balancing ────────────────────────────────────────────────────────────
-# Production requires an ACM certificate for HTTPS. The HTTP listener automatically
-# redirects to HTTPS when certificate_arn is provided (see ALB module).
-# To provision a certificate, create an aws_acm_certificate resource or import
-# an existing certificate and pass its ARN via var.certificate_arn.
+# The HTTPS listener is enabled because module.acm provides a validated cert ARN.
+# The HTTP listener automatically redirects to HTTPS (301) when certificate_arn
+# is set — see the ALB module for listener logic.
 
 module "alb" {
   source = "../../modules/alb"
@@ -135,12 +162,36 @@ module "alb" {
   subnet_ids         = module.vpc.public_subnet_ids
   security_group_ids = [module.alb_sg.security_group_id]
 
-  certificate_arn            = var.certificate_arn
+  certificate_arn            = module.acm.certificate_arn
   health_check_path          = "/health"
   enable_deletion_protection = true  # Prevent accidental destroy of live load balancer
   idle_timeout               = 120
 
   tags = local.tags
+}
+
+# ── ALB Alias Record ──────────────────────────────────────────────────────────
+# Created here (not inside the DNS module) to avoid a circular dependency:
+#   module.dns.zone_id → module.acm → module.alb → alias record → module.dns
+# Terraform cannot resolve that cycle across module boundaries. Placing the
+# alias record at the environment root module breaks the chain cleanly while
+# keeping the individual modules free of cross-module coupling.
+#
+# An Alias record is used instead of a CNAME because:
+#   - No per-query cost (AWS resolves alias records internally)
+#   - Works at the zone apex (example.com, not only sub.example.com)
+#   - AWS automatically tracks ALB IP address changes
+
+resource "aws_route53_record" "alb_alias" {
+  zone_id = module.dns.zone_id
+  name    = "app.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = module.alb.alb_dns_name
+    zone_id                = module.alb.alb_zone_id
+    evaluate_target_health = true
+  }
 }
 
 # ── IAM ──────────────────────────────────────────────────────────────────────
