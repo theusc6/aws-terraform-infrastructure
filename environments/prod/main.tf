@@ -50,16 +50,16 @@ module "kms" {
 module "vpc" {
   source = "../../modules/networking/vpc-module"
 
-  environment          = local.environment
-  vpc_cidr             = local.vpc_cidr
-  azs                  = local.azs
-  public_subnet_cidrs  = local.public_subnet_cidrs
-  private_subnet_cidrs = local.private_subnet_cidrs
-  enable_nat_gateway   = true
-  single_nat_gateway   = false  # One NAT GW per AZ for full AZ-level HA
-  enable_flow_logs     = true
-  flow_logs_retention_days = 90  # Retain 90 days of flow logs in production
-  tags                 = local.tags
+  environment              = local.environment
+  vpc_cidr                 = local.vpc_cidr
+  azs                      = local.azs
+  public_subnet_cidrs      = local.public_subnet_cidrs
+  private_subnet_cidrs     = local.private_subnet_cidrs
+  enable_nat_gateway       = true
+  single_nat_gateway       = false # One NAT GW per AZ for full AZ-level HA
+  enable_flow_logs         = true
+  flow_logs_retention_days = 90 # Retain 90 days of flow logs in production
+  tags                     = local.tags
 }
 
 module "alb_sg" {
@@ -164,7 +164,7 @@ module "alb" {
 
   certificate_arn            = module.acm.certificate_arn
   health_check_path          = "/health"
-  enable_deletion_protection = true  # Prevent accidental destroy of live load balancer
+  enable_deletion_protection = true # Prevent accidental destroy of live load balancer
   idle_timeout               = 120
 
   tags = local.tags
@@ -250,7 +250,7 @@ module "app_storage" {
   versioning_enabled = true
   kms_key_arn        = module.kms.key_arn
   logging_bucket_id  = module.access_logs_bucket.bucket_id
-  force_destroy      = false  # Safety: production data must be explicitly emptied first
+  force_destroy      = false # Safety: production data must be explicitly emptied first
 
   lifecycle_rules = [
     {
@@ -288,7 +288,7 @@ module "app_compute" {
   security_group_ids        = [module.app_sg.security_group_id]
   iam_instance_profile      = module.ec2_role.instance_profile_name
   target_group_arns         = [module.alb.target_group_arn]
-  health_check_grace_period = 300  # Allow time for application startup
+  health_check_grace_period = 300 # Allow time for application startup
 
   min_size         = 2
   max_size         = 6
