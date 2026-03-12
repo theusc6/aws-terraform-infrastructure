@@ -1,12 +1,6 @@
 name: Prod
 
 on:
-  pull_request:
-    paths:
-      - 'environments/prod/**.tf'
-      - 'modules/**/*.tf'
-    branches:
-      - main
   push:
     tags:
       - 'prod-*'
