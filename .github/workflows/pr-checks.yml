@@ -89,10 +89,15 @@ jobs:
             --skip-check CKV_AWS_260 \
             --skip-check CKV_AWS_300 \
             --skip-check CKV_AWS_338 \
+            --skip-check CKV2_AWS_5 \
+            --skip-check CKV2_AWS_12 \
+            --skip-check CKV2_AWS_20 \
+            --skip-check CKV2_AWS_28 \
+            --skip-check CKV2_AWS_62 \
             --compact \
             --quiet
           # Skipped checks — known gaps in module code, no real AWS environment:
-          # CKV_TF_1:   local monorepo modules use git as version boundary
+          # CKV_TF_1:    local monorepo modules use git as version boundary
           # CKV_AWS_21:  S3 versioning — not required for dev state bucket
           # CKV_AWS_26:  SNS topic encryption — dev environment only
           # CKV_AWS_91:  ELBv2 access logging — not needed in dev
@@ -105,6 +110,11 @@ jobs:
           # CKV_AWS_260: SG ingress port 80 — intentional for public ALB
           # CKV_AWS_300: S3 lifecycle abort policy — to be added to storage module
           # CKV_AWS_338: CloudWatch log retention 1 year — relaxed for dev
+          # CKV2_AWS_5:  SGs not attached to resource — detected before attachment
+          # CKV2_AWS_12: Default VPC SG allows traffic — managed outside Terraform
+          # CKV2_AWS_20: ALB HTTP→HTTPS redirect — not required in dev
+          # CKV2_AWS_28: ALB not behind WAF — WAF not provisioned in dev
+          # CKV2_AWS_62: S3 event notifications — not required in dev
 
   # ── Static Analysis ───────────────────────────────────────────────────────
   tflint:
