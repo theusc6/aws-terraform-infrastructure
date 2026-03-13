@@ -83,7 +83,7 @@ jobs:
           role-session-name: github-actions-${{ inputs.environment }}-plan
 
       - name: Setup Terraform ${{ inputs.tf_version }}
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4.0.0
         with:
           terraform_version: ${{ inputs.tf_version }}
           terraform_wrapper: false   # Must be false for Infracost JSON parsing
@@ -257,7 +257,7 @@ jobs:
 
       - name: Setup Terraform ${{ inputs.tf_version }}
         if: steps.check-key.outputs.present == 'true'
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4.0.0
         with:
           terraform_version: ${{ inputs.tf_version }}
           terraform_wrapper: false   # Required — Infracost needs raw terraform output
@@ -343,7 +343,7 @@ jobs:
           role-session-name: github-actions-${{ inputs.environment }}-apply
 
       - name: Setup Terraform ${{ inputs.tf_version }}
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4.0.0
         with:
           terraform_version: ${{ inputs.tf_version }}
           terraform_wrapper: false

@@ -70,7 +70,7 @@ jobs:
           role-session-name: github-actions-drift-dev
 
       - name: Setup Terraform ${{ env.TF_VERSION }}
-        uses: hashicorp/setup-terraform@v2.0.3
+        uses: hashicorp/setup-terraform@v4.0.0
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
@@ -152,7 +152,7 @@ jobs:
           role-session-name: github-actions-drift-staging
 
       - name: Setup Terraform ${{ env.TF_VERSION }}
-        uses: hashicorp/setup-terraform@v2.0.3
+        uses: hashicorp/setup-terraform@v4.0.0
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
@@ -229,7 +229,7 @@ jobs:
           role-session-name: github-actions-drift-prod
 
       - name: Setup Terraform ${{ env.TF_VERSION }}
-        uses: hashicorp/setup-terraform@v2.0.3
+        uses: hashicorp/setup-terraform@v4.0.0
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
