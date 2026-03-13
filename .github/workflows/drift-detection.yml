@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@v4.1.0
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4.0.1
+        uses: aws-actions/configure-aws-credentials@v6.0.0
         with:
           role-to-assume: ${{ secrets.DEV_DEPLOY_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
@@ -145,7 +145,7 @@ jobs:
         uses: actions/checkout@v4.1.0
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4.0.1
+        uses: aws-actions/configure-aws-credentials@v6.0.0
         with:
           role-to-assume: ${{ secrets.STAGING_DEPLOY_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
@@ -222,7 +222,7 @@ jobs:
         uses: actions/checkout@v4.1.0
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4.0.1
+        uses: aws-actions/configure-aws-credentials@v6.0.0
         with:
           role-to-assume: ${{ secrets.PROD_DEPLOY_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
