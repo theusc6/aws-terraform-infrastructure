@@ -44,10 +44,7 @@ jobs:
   drift-dev:
     name: Drift Check — dev
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'schedule' ||
-      github.event.inputs.environment == 'all' ||
-      github.event.inputs.environment == 'dev'
+    if: false # Disabled until AWS credentials are configured — remove this line to enable
     permissions:
       contents: read
       id-token: write
@@ -129,10 +126,7 @@ jobs:
   drift-staging:
     name: Drift Check — staging
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'schedule' ||
-      github.event.inputs.environment == 'all' ||
-      github.event.inputs.environment == 'staging'
+    if: false # Disabled until AWS credentials are configured — remove this line to enable
     permissions:
       contents: read
       id-token: write
@@ -209,10 +203,7 @@ jobs:
   drift-prod:
     name: Drift Check — prod
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'schedule' ||
-      github.event.inputs.environment == 'all' ||
-      github.event.inputs.environment == 'prod'
+    if: false # Disabled until AWS credentials are configured — remove this line to enable
     permissions:
       contents: read
       id-token: write
