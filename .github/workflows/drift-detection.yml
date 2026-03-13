@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload drift report
         if: steps.plan.outputs.exit_code == '2'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: drift-dev-${{ github.run_id }}
           path: plan_output.txt
@@ -174,7 +174,7 @@ jobs:
 
       - name: Upload drift report
         if: steps.plan.outputs.exit_code == '2'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: drift-staging-${{ github.run_id }}
           path: plan_output.txt
@@ -251,7 +251,7 @@ jobs:
 
       - name: Upload drift report
         if: steps.plan.outputs.exit_code == '2'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: drift-prod-${{ github.run_id }}
           path: plan_output.txt
