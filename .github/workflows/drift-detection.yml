@@ -41,6 +41,12 @@ env:
   TF_VERSION: "1.7.5"
 
 jobs:
+  disabled:
+    name: Drift Detection (disabled)
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Drift detection is disabled — configure AWS credentials to enable."
+
   drift-dev:
     name: Drift Check — dev
     runs-on: ubuntu-latest
