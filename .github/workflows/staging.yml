@@ -1,12 +1,6 @@
 name: Staging
 
 on:
-  pull_request:
-    paths:
-      - 'environments/staging/**.tf'
-      - 'modules/**/*.tf'
-    branches:
-      - main
   push:
     tags:
       - 'staging-*'

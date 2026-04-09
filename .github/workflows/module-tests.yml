@@ -45,6 +45,8 @@ jobs:
       - name: Validate each module
         run: |
           for module in \
+            modules/acm \
+            modules/dns \
             modules/kms \
             modules/storage \
             modules/alb \
@@ -67,6 +69,8 @@ jobs:
     name: Detect Changed Modules
     runs-on: ubuntu-latest
     outputs:
+      acm:          ${{ steps.changes.outputs.acm }}
+      dns:          ${{ steps.changes.outputs.dns }}
       alb:          ${{ steps.changes.outputs.alb }}
       compute:      ${{ steps.changes.outputs.compute }}
       iam:          ${{ steps.changes.outputs.iam }}
@@ -87,6 +91,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # Manual run — test everything
+            echo "acm=true"          >> "$GITHUB_OUTPUT"
+            echo "dns=true"          >> "$GITHUB_OUTPUT"
             echo "alb=true"          >> "$GITHUB_OUTPUT"
             echo "compute=true"      >> "$GITHUB_OUTPUT"
             echo "iam=true"          >> "$GITHUB_OUTPUT"
@@ -102,6 +108,8 @@ jobs:
             CHANGED=$(git diff --name-only "$BASE" "$HEAD")
             echo "$CHANGED"
 
+            grep -q "^modules/acm/"                                    <<< "$CHANGED" && echo "acm=true"          >> "$GITHUB_OUTPUT" || echo "acm=false"          >> "$GITHUB_OUTPUT"
+            grep -q "^modules/dns/"                                    <<< "$CHANGED" && echo "dns=true"          >> "$GITHUB_OUTPUT" || echo "dns=false"          >> "$GITHUB_OUTPUT"
             grep -q "^modules/alb/"                                    <<< "$CHANGED" && echo "alb=true"          >> "$GITHUB_OUTPUT" || echo "alb=false"          >> "$GITHUB_OUTPUT"
             grep -q "^modules/compute/"                                <<< "$CHANGED" && echo "compute=true"      >> "$GITHUB_OUTPUT" || echo "compute=false"      >> "$GITHUB_OUTPUT"
             grep -q "^modules/iam/"                                    <<< "$CHANGED" && echo "iam=true"          >> "$GITHUB_OUTPUT" || echo "iam=false"          >> "$GITHUB_OUTPUT"
@@ -112,6 +120,50 @@ jobs:
             grep -q "^modules/networking/security-group-module/"       <<< "$CHANGED" && echo "sg=true"           >> "$GITHUB_OUTPUT" || echo "sg=false"           >> "$GITHUB_OUTPUT"
             grep -q "^modules/networking/vpc-endpoint-module/"         <<< "$CHANGED" && echo "vpc-endpoint=true" >> "$GITHUB_OUTPUT" || echo "vpc-endpoint=false" >> "$GITHUB_OUTPUT"
           fi
+
+  test-acm:
+    name: Test — modules/acm
+    needs: detect-changes
+    if: needs.detect-changes.outputs.acm == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/acm init
+
+      - name: Run tests
+        run: terraform -chdir=modules/acm test -verbose
+
+  test-dns:
+    name: Test — modules/dns
+    needs: detect-changes
+    if: needs.detect-changes.outputs.dns == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=modules/dns init
+
+      - name: Run tests
+        run: terraform -chdir=modules/dns test -verbose
 
   test-kms:
     name: Test — modules/kms
@@ -316,13 +368,15 @@ jobs:
   # It passes even when no modules changed (all test jobs were skipped).
   tests-passed:
     name: Module Tests Passed
-    needs: [fmt-validate, test-kms, test-storage, test-alb, test-vpc, test-compute, test-iam, test-monitoring, test-sg, test-vpc-endpoint]
+    needs: [fmt-validate, test-acm, test-dns, test-kms, test-storage, test-alb, test-vpc, test-compute, test-iam, test-monitoring, test-sg, test-vpc-endpoint]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check test results
         run: |
           results=(
+            "${{ needs.test-acm.result }}"
+            "${{ needs.test-dns.result }}"
             "${{ needs.test-kms.result }}"
             "${{ needs.test-storage.result }}"
             "${{ needs.test-alb.result }}"

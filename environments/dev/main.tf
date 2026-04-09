@@ -38,10 +38,10 @@ data "aws_ami" "amazon_linux_2023" {
 module "kms" {
   source = "../../modules/kms"
 
-  alias_name   = "${local.environment}-app"
-  description  = "Customer-managed key for ${local.environment} S3 and EBS encryption"
-  environment  = local.environment
-  tags         = local.tags
+  alias_name  = "${local.environment}-app"
+  description = "Customer-managed key for ${local.environment} S3 and EBS encryption"
+  environment = local.environment
+  tags        = local.tags
 }
 
 # ── Networking ────────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ module "vpc" {
   public_subnet_cidrs  = local.public_subnet_cidrs
   private_subnet_cidrs = local.private_subnet_cidrs
   enable_nat_gateway   = true
-  single_nat_gateway   = true  # Single NAT GW keeps dev costs low; not HA
+  single_nat_gateway   = true # Single NAT GW keeps dev costs low; not HA
   enable_flow_logs     = true
   tags                 = local.tags
 }
@@ -137,7 +137,7 @@ module "alb" {
   certificate_arn = null
 
   health_check_path          = "/health"
-  enable_deletion_protection = false  # Allow terraform destroy in dev
+  enable_deletion_protection = false # Allow terraform destroy in dev
 
   tags = local.tags
 }
@@ -179,14 +179,14 @@ module "access_logs_bucket" {
 
   bucket_name        = "${local.environment}-access-logs-${var.account_id}"
   environment        = local.environment
-  versioning_enabled = false  # Access logs grow large; versioning is not needed here
+  versioning_enabled = false # Access logs grow large; versioning is not needed here
   kms_key_arn        = module.kms.key_arn
 
   lifecycle_rules = [
     {
-      id      = "expire-logs"
-      enabled = true
-      expiration_days = 30  # Keep 30 days of access logs in dev
+      id              = "expire-logs"
+      enabled         = true
+      expiration_days = 30 # Keep 30 days of access logs in dev
     }
   ]
 
@@ -204,8 +204,8 @@ module "app_storage" {
 
   lifecycle_rules = [
     {
-      id      = "expire-old-noncurrent-versions"
-      enabled = true
+      id                                 = "expire-old-noncurrent-versions"
+      enabled                            = true
       noncurrent_version_expiration_days = 30
     }
   ]
