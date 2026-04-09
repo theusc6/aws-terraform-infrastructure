@@ -10,6 +10,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 
 ---
 
+## [1.2.0] — 2026-03-12
+
+### Added
+- `modules/acm` — ACM certificate module with DNS validation via Route 53. Includes `create_before_destroy` lifecycle, automatic CNAME record creation, and blocks apply until certificate is `ISSUED`.
+- `modules/dns` — Route 53 public hosted zone module. Outputs `zone_id` and `name_servers`.
+- `modules/acm/acm_unit.tftest.hcl` — Unit tests covering DNS validation method, subject alternative names, validation record wiring, required tags, and output correctness.
+- `modules/dns/dns_unit.tftest.hcl` — Unit tests covering hosted zone creation, record wiring, and outputs.
+- `modules/acm/README.md`, `modules/dns/README.md` — Full module documentation.
+- `modules/acm/versions.tf`, `modules/dns/versions.tf` — Provider version constraints.
+- `.github/workflows/pr-checks.yml` — Dedicated PR validation workflow running `Plan (dev)`, `Checkov Security Scan (dev)`, and `TFLint (dev)` without AWS credentials.
+- `.github/dependabot.yml` — Weekly Dependabot updates for GitHub Actions versions.
+- `.github/ISSUE_TEMPLATE/bug_report.md`, `feature_request.md` — Structured issue templates.
+- `SECURITY.md` — Security disclosure policy and security design principles.
+- `.pre-commit-config.yaml` — Local pre-commit hooks for fmt, validate, tflint, and secret scanning.
+- Branch protection on `main` with 5 required status checks enforced for all contributors including admins.
+
+### Changed
+- `.github/workflows/dev.yml`, `staging.yml`, `prod.yml` — Removed `pull_request` triggers; deployments are now exclusively tag-driven (`dev-*`, `staging-*`, `prod-*`). PR validation handled by `pr-checks.yml`.
+- `.github/workflows/module-tests.yml` — Added `acm` and `dns` modules to the test matrix (11 modules total).
+- `.github/workflows/drift-detection.yml` — Disabled all jobs until AWS credentials are configured; stub job ensures the workflow shows green rather than failing.
+- `.github/CODEOWNERS` — Replaced placeholder `@your-org/platform-team` handles with `@theusc6`.
+- `scripts/setup-branch-protection.sh` — Removed PR review requirement (personal repo limitation); status checks are the merge gate.
+- `environments/prod/main.tf` — Wired `dns` and `acm` modules into the prod environment; replaced manual `certificate_arn` variable with fully Terraform-managed TLS provisioning.
+- `README.md` — Architecture diagram updated for Route 53 → ACM → ALB flow; module catalogue, CI/CD pipeline, secrets table, branching strategy, and testing section updated.
+
+---
+
 ## [1.1.0] — 2026-03-11
 
 ### Added
@@ -63,6 +90,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and 
 - `.tflint.hcl` — TFLint configuration with AWS plugin enabled.
 - `.gitignore` — Excludes state files, `.terraform` directories, plan outputs, and secrets.
 
-[Unreleased]: https://github.com/theusc6/aws-terraform-infrastructure/compare/prod-v1.1.0...HEAD
-[1.1.0]: https://github.com/theusc6/aws-terraform-infrastructure/compare/prod-v1.0.0...prod-v1.1.0
-[1.0.0]: https://github.com/theusc6/aws-terraform-infrastructure/releases/tag/prod-v1.0.0
+[Unreleased]: https://github.com/theusc6/aws-terraform-infrastructure/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/theusc6/aws-terraform-infrastructure/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/theusc6/aws-terraform-infrastructure/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/theusc6/aws-terraform-infrastructure/releases/tag/v1.0.0
