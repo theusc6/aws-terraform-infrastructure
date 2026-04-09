@@ -1,0 +1,51 @@
+name: Validate
+
+# Validates Terraform configuration across all environments on every push.
+# No AWS credentials required — uses -backend=false and a dummy account ID.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'environments/**/*.tf'
+      - 'modules/**/*.tf'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'environments/**/*.tf'
+      - 'modules/**/*.tf'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: "1.10.5"
+
+jobs:
+  validate:
+    name: Validate — ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, staging, prod]
+    env:
+      TF_VAR_account_id: "000000000000"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init (no backend)
+        run: terraform -chdir=environments/${{ matrix.environment }} init -backend=false -input=false
+
+      - name: Terraform Validate
+        run: terraform -chdir=environments/${{ matrix.environment }} validate

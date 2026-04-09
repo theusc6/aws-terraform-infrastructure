@@ -48,6 +48,7 @@ terraform -chdir=modules/kms test -verbose
 | `storage_unit.tftest.hcl` | `modules/storage` | Unit (mock) |
 | `alb_unit.tftest.hcl` | `modules/alb` | Unit (mock) |
 | `networking_unit.tftest.hcl` | `modules/networking/vpc-module` | Unit (mock) |
+| `full_stack_integration.tftest.hcl` | `environments/dev` (all modules) | Integration (mock) |
 
 ## Adding new tests
 

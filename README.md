@@ -1,5 +1,6 @@
 # AWS Terraform Infrastructure
 
+![Validate](https://github.com/theusc6/aws-terraform-infrastructure/actions/workflows/validate.yml/badge.svg)
 ![Module Tests](https://github.com/theusc6/aws-terraform-infrastructure/actions/workflows/module-tests.yml/badge.svg)
 ![Drift Detection](https://github.com/theusc6/aws-terraform-infrastructure/actions/workflows/drift-detection.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

@@ -8,6 +8,8 @@ on:
   pull_request:
     paths:
       - 'modules/**'
+      - 'environments/**'
+      - 'tests/**'
     branches:
       - main
   push:
@@ -15,6 +17,8 @@ on:
       - main
     paths:
       - 'modules/**'
+      - 'environments/**'
+      - 'tests/**'
   workflow_dispatch: {}
 
 permissions:
@@ -363,12 +367,36 @@ jobs:
       - name: Run tests
         run: terraform -chdir=modules/networking/vpc-endpoint-module test -verbose
 
+  # ── Integration test: full-stack wiring ────────────────────────────────────
+  # Validates that all modules compose correctly by planning the dev environment
+  # end-to-end with mock providers.
+  test-integration:
+    name: Test — full stack integration
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform -chdir=environments/dev init -backend=false -input=false
+
+      - name: Run integration tests
+        run: terraform -chdir=environments/dev test -test-directory=../../tests -verbose
+
   # Summary job: required status check that passes when all relevant tests pass.
   # Set this as a required PR check in branch protection rules.
   # It passes even when no modules changed (all test jobs were skipped).
   tests-passed:
     name: Module Tests Passed
-    needs: [fmt-validate, test-acm, test-dns, test-kms, test-storage, test-alb, test-vpc, test-compute, test-iam, test-monitoring, test-sg, test-vpc-endpoint]
+    needs: [fmt-validate, test-acm, test-dns, test-kms, test-storage, test-alb, test-vpc, test-compute, test-iam, test-monitoring, test-sg, test-vpc-endpoint, test-integration]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -386,6 +414,7 @@ jobs:
             "${{ needs.test-monitoring.result }}"
             "${{ needs.test-sg.result }}"
             "${{ needs.test-vpc-endpoint.result }}"
+            "${{ needs.test-integration.result }}"
           )
           for result in "${results[@]}"; do
             if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
