@@ -1,0 +1,14 @@
+# Copy this file to terraform.tfvars and fill in the values.
+# terraform.tfvars is gitignored — never commit real values.
+
+# Your AWS account ID (12 digits, no hyphens)
+account_id = "123456789012"
+
+# AWS region — must match the region configured in backend.tf
+region = "us-west-2"
+
+# Optional: ACM certificate ARN for HTTPS. Leave commented out to use HTTP only.
+# certificate_arn = "arn:aws:acm:us-west-2:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Optional: Email for CloudWatch alarm notifications
+# alarm_email = "ops-team@example.com"

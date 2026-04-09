@@ -1,0 +1,41 @@
+name: Staging
+
+on:
+  pull_request:
+    paths:
+      - 'environments/staging/**.tf'
+      - 'modules/**/*.tf'
+    branches:
+      - main
+  push:
+    tags:
+      - 'staging-*'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+
+concurrency:
+  group: terraform-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/terraform-deploy.yml
+    with:
+      environment: staging
+      run_apply: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/staging-')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply') }}
+      require_approval: false
+    secrets:
+      aws_role_arn: ${{ secrets.STAGING_DEPLOY_ROLE }}
+      infracost_api_key: ${{ secrets.INFRACOST_API_KEY }}
+      aws_account_id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
