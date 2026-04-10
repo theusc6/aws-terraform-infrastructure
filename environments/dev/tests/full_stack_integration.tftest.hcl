@@ -7,7 +7,7 @@
 # land in private subnets behind the ALB, and monitoring is wired to the
 # correct ASG and ALB resources.
 #
-# Run with: terraform -chdir=environments/dev test -test-directory=../../tests
+# Run with: terraform -chdir=environments/dev test -verbose
 
 mock_provider "aws" {
   mock_data "aws_ami" {

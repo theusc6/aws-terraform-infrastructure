@@ -389,7 +389,7 @@ jobs:
         run: terraform -chdir=environments/dev init -backend=false -input=false
 
       - name: Run integration tests
-        run: terraform -chdir=environments/dev test -test-directory=../../tests -verbose
+        run: terraform -chdir=environments/dev test -verbose
 
   # Summary job: required status check that passes when all relevant tests pass.
   # Set this as a required PR check in branch protection rules.

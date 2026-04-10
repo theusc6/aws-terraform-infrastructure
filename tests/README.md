@@ -13,14 +13,16 @@ Tests are divided into two categories:
 | Unit (mock) | Variable validation, output correctness, resource configuration | No |
 | Integration | Actual AWS API calls, resource creation/destruction | Yes |
 
-The tests in this directory are **unit tests using mock providers**. They validate that:
+Unit tests live alongside each module (e.g. `modules/kms/kms_unit.tftest.hcl`). They use
+**mock providers** and validate that:
 - Variable constraints are enforced correctly
 - Resources are configured with expected security properties
 - Outputs are wired to the correct resource attributes
 - Conditional logic (e.g. "only create HTTPS listener when certificate_arn is set") works
 
-Integration tests (which create real AWS resources) are not committed because they require
-live credentials and incur cost. The patterns below serve as templates.
+A **full-stack integration test** (`environments/dev/tests/full_stack_integration.tftest.hcl`)
+plans the entire dev environment end-to-end with mock providers to verify cross-module wiring.
+No AWS credentials required.
 
 ## Running tests
 
@@ -48,7 +50,7 @@ terraform -chdir=modules/kms test -verbose
 | `storage_unit.tftest.hcl` | `modules/storage` | Unit (mock) |
 | `alb_unit.tftest.hcl` | `modules/alb` | Unit (mock) |
 | `networking_unit.tftest.hcl` | `modules/networking/vpc-module` | Unit (mock) |
-| `full_stack_integration.tftest.hcl` | `environments/dev` (all modules) | Integration (mock) |
+| `environments/dev/tests/full_stack_integration.tftest.hcl` | `environments/dev` (all modules) | Integration (mock) |
 
 ## Adding new tests
 
