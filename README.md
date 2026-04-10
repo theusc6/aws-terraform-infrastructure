@@ -93,6 +93,7 @@ aws-terraform-infrastructure/
 ├── .github/
 │   ├── CODEOWNERS                     # Auto-assign reviewers by file path
 │   └── workflows/
+│       ├── validate.yml           # Terraform validate across all environments (no AWS needed)
 │       ├── pr-checks.yml          # PR validation — fmt, validate, Checkov, TFLint (no AWS needed)
 │       ├── module-tests.yml       # Terraform native tests for all modules (mock providers)
 │       ├── secret-scan.yml        # Gitleaks secret scanning on every push
@@ -199,7 +200,7 @@ aws-terraform-infrastructure/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<org>/aws-terraform-infrastructure.git
+git clone https://github.com/theusc6/aws-terraform-infrastructure.git
 cd aws-terraform-infrastructure
 ```
 
@@ -412,7 +413,7 @@ terraform -chdir=modules/networking/vpc-endpoint-module test -verbose
 
 ### CI
 
-The `module-tests.yml` workflow runs automatically on every PR and push to `main` that touches `modules/**`. It detects which modules changed and only tests those — keeping CI fast. A summary job (`Module Tests Passed`) is available as a required branch protection status check.
+The `module-tests.yml` workflow runs automatically on every PR and push to `main` that touches `modules/**` or `environments/**`. It detects which modules changed and only tests those — keeping CI fast. A full-stack integration test (`tests/full_stack_integration.tftest.hcl`) also runs to verify cross-module wiring by planning the entire dev environment with mock providers. A summary job (`Module Tests Passed`) is available as a required branch protection status check.
 
 All eleven modules have test coverage:
 
