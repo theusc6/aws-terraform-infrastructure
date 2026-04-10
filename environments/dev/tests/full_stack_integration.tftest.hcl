@@ -66,7 +66,7 @@ variables {
 # and no circular dependencies or type mismatches exist.
 
 run "full_stack_plans_without_error" {
-  command = plan
+  command = apply
 
   assert {
     condition     = length(module.vpc.public_subnet_ids) == 2
