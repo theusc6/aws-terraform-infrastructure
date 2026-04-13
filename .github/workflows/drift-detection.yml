@@ -71,7 +71,7 @@ jobs:
       TF_VAR_account_id: ${{ secrets[matrix.account_id_secret] }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v6
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4.0.1
